@@ -33,14 +33,12 @@ A HyperOS ROM porting tool for Xiaomi/Redmi devices. It covers the common workfl
 
 ### Tested & Verified
 - **Base (Stock):**
-  - Poco F7 (onyx - HyperOS 2.0 / A15)
-  - Xiaomi 13 (HyperOS 2.0/3.0)
-  - Xiaomi 12S (HyperOS 3.0 / A15)
-  - Xiaomi 17 (HyperOS 3.0 / A16 / KMI 6.12)
+  - Poco F7 (onyx - HyperOS 3.0 / A16)
+  - Tasted using CN Base
 - **Port Sources:**
-  - Xiaomi 14 / 15 / 17
-  - Redmi K90 / K90 Pro
-  - Supports HyperOS CN 3.0 (Stable & Beta)
+  - Xiaomi 17
+  - Tasted using CN Base
+  - Supports HyperOS CN 4.0 (Stable & Beta)
 
 ---
 
