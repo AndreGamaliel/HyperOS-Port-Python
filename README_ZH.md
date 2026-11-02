@@ -436,7 +436,6 @@ pre-commit run --all-files
 
 **特别感谢:**
 - [HyperCeiler](https://github.com/ReChronoRain/HyperCeiler/)
-- [OemPorts10T-PIF](https://github.com/Danda420/OemPorts10T-PIF)
 - [FrameworkPatcher](https://github.com/FrameworksForge/FrameworkPatcher)
 - [xiaomi.eu](https://xiaomi.eu)
 

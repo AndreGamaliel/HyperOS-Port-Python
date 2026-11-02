@@ -432,7 +432,6 @@ This project was primarily completed with AI collaboration, including
 
 **Special Thanks:**
 - [HyperCeiler](https://github.com/ReChronoRain/HyperCeiler/)
-- [OemPorts10T-PIF](https://github.com/Danda420/OemPorts10T-PIF)
 - [FrameworkPatcher](https://github.com/FrameworksForge/FrameworkPatcher)
 - [xiaomi.eu](https://xiaomi.eu)
 
