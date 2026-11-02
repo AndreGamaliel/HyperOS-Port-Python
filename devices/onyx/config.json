@@ -1,0 +1,19 @@
+{
+    "_comment": "Poco F7 (onyx) device configuration - overrides common config values",
+    "wild_boost": {
+        "enable": true
+    },
+    "pack": {
+        "type": "payload",
+        "fs_type": "erofs",
+        "super_size": 13411287040
+    },
+    "ksu": {
+        "enable": false
+    },
+    "cache": {
+        "_comment": "Set to true to enable partition-level caching (disabled by default)",
+        "partitions": false
+    }
+}
+

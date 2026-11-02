@@ -1,0 +1,17 @@
+{
+    "xml_features": {
+        "support_wild_boost": true,
+        "support_wild_boost_bat_perf": true,
+        "support_screen_enhance_engine": true,
+        "support_aod_fullscreen": true,
+        "support_power_consumption": true
+    },
+    "build_props": {
+        "product": {
+            "ro.product.device": "onyx",
+            "ro.product.name": "onyx",
+            "persist.sys.miui.unfairMemory.enable": "false"
+        }
+    }
+}
+

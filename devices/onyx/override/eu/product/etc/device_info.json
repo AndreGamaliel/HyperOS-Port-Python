@@ -1,0 +1,26 @@
+[
+  {
+    "hwc": ["GL", "IN", "CN"],
+    "basic": {
+      "cpu": {
+        "zh": "第四代骁龙®8s移动平台",
+        "en": "Snapdragon 8s Gen 4"
+      },
+      "battery": "6500mAh",
+      "camera": {
+        "zh": "5000万像素 超清双摄",
+        "en": "50MP+8MP"
+      },
+      "screen": {
+        "zh": "6.83 英寸 AMOLED 1.5K",
+        "en": "6.83″ AMOLED 1.5K"
+      },
+      "resolution": "2772×1280"
+    },
+    "camera": {
+      "front_camera": "20MP",
+      "rear_camera": "50MP+8MP"
+    }
+  }
+]
+

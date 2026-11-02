@@ -1,5 +1,5 @@
 {
-    "device_code": "pudding",
+    "device_code": "onyx",
     "super_size": 13411287040,
     "dynamic_partitions": [
         "odm",
@@ -113,3 +113,4 @@
         "vendor_boot"
     ]
 }
+
