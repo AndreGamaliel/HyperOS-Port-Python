@@ -1,5 +1,5 @@
 {
-    "_comment": "Fuxi (小米 13) 设备配置 - 覆盖通用配置的值",
+    "_comment": "Fuxi (Xiaomi 13) device configuration - overrides common config values",
     "wild_boost": {
         "enable": true
     },

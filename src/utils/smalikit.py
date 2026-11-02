@@ -301,7 +301,7 @@ def main():
     )
     parser.add_argument("-al", dest="after_line", nargs=2, help="Insert line AFTER string match")
     parser.add_argument("-bl", dest="before_line", nargs=2, help="Insert line BEFORE string match")
-    # [新增参数]
+    # [New argument]
     parser.add_argument(
         "-il",
         dest="insert_line",

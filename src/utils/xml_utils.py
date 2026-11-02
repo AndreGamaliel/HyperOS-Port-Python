@@ -111,7 +111,7 @@ class XmlUtils:
 
     def add_public_id(self, res_dir: Path, res_type: str, name: str) -> Optional[str]:
         """
-        向 public.xml 注册新 ID (自动增长，无视属性顺序)
+        Register a new ID to public.xml (auto-incrementing, attribute order agnostic).
         """
         if not res_dir: return None
         public_xml = res_dir / "values/public.xml"
@@ -119,13 +119,13 @@ class XmlUtils:
 
         content = public_xml.read_text(encoding='utf-8', errors='ignore')
         
-        # 1. 检查是否已存在
+        # 1. Check if already exists
         if f'name="{name}"' in content:
             match = re.search(rf'<public[^>]*name="{name}"[^>]*id="(0x[0-9a-fA-F]+)"', content)
             if match:
                 return match.group(1)
 
-        # 2. 计算新 ID
+        # 2. Calculate new ID
         ids = []
         for match in re.finditer(r'<public([^>]+)>', content):
             attrs = match.group(1)
@@ -143,7 +143,7 @@ class XmlUtils:
         
         new_id_hex = f"0x{new_id_int:x}"
         
-        # 3. 插入新 ID
+        # 3. Insert new ID
         line = f'\n    <public type="{res_type}" name="{name}" id="{new_id_hex}" />\n'
         parts = content.rsplit('</resources>', 1)
         if len(parts) == 2:
@@ -158,7 +158,7 @@ class XmlUtils:
 
     def add_array_item(self, res_dir: Path, array_name: str, items: List[str], lang_suffix: str = ""):
         """
-        向 arrays.xml 中的指定数组批量追加多个 <item>
+        Batch append multiple <item> entries to the specified array in arrays.xml.
         """
         if not res_dir or not items: 
             return

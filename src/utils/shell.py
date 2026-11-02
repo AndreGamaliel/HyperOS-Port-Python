@@ -24,7 +24,7 @@ class ShellRunner:
         elif machine in ["aarch64", "arm64"]:
             self.arch = "aarch64"
         else:
-            self.arch = "x86_64" # 默认 fallback
+            self.arch = "x86_64"  # Default fallback
 
         project_root = Path(__file__).resolve().parent.parent.parent
         self.bin_dir = project_root / "bin" / self.os_name / self.arch

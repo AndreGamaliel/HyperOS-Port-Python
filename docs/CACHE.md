@@ -1,42 +1,42 @@
-# Port ROM Cache机制
+# Port ROM Cache System
 
-## 概述
+## Overview
 
-Port ROM Cache机制是一个分层缓存系统，用于加速多机型ROM移植过程。它允许同一个Port ROM的处理结果（提取的分区和修改的APK）被多个不同机型的移植任务复用，显著减少重复工作。
+The Port ROM Cache mechanism is a hierarchical caching system designed to speed up the ROM porting process across multiple devices. It allows the processing output of a given Port ROM (extracted partitions and modified APKs) to be reused across different target device porting tasks, significantly reducing redundant work.
 
-## 特性
+## Features
 
-- **分层缓存**: 支持分区级缓存（Level 1）和APK修改缓存（Level 2）
-- **文件锁支持**: 并发安全，支持多进程同时访问
-- **版本控制**: 基于ROM哈希和修改器版本的自动缓存失效
-- **完整性验证**: 自动验证缓存完整性，支持修复
+- **Hierarchical Caching**: Supports partition-level caching (Level 1) and APK modification caching (Level 2).
+- **File Locking**: Concurrency-safe, supporting multi-process concurrent access.
+- **Version Control**: Automatic cache invalidation based on ROM hash and modifier versioning.
+- **Integrity Verification**: Automatic verification of cache consistency with repair support.
 
-## 使用方法
+## Usage
 
-### 基本用法
+### Basic Usage
 
-默认情况下，缓存是启用的：
+Caching is enabled by default:
 
 ```bash
 python main.py --stock stock.zip --port port.zip
 ```
 
-### CLI参数
+### CLI Arguments
 
-| 参数 | 说明 | 默认值 |
+| Argument | Description | Default |
 |------|------|--------|
-| `--cache-dir` | 缓存目录路径 | `.cache/portroms` |
-| `--no-cache` | 禁用缓存，强制完整提取和修改 | - |
-| `--clear-cache` | 开始前清除所有缓存 | - |
-| `--show-cache-stats` | 显示缓存统计并退出 | - |
+| `--cache-dir` | Path to cache directory | `.cache/portroms` |
+| `--no-cache` | Disable cache, force full extraction and modification | - |
+| `--clear-cache` | Clear all cache before starting | - |
+| `--show-cache-stats` | Display cache statistics and exit | - |
 
-### 查看缓存统计
+### Inspect Cache Statistics
 
 ```bash
 python main.py --show-cache-stats
 ```
 
-输出示例：
+Example Output:
 ```json
 {
   "version": "1.0",
@@ -56,138 +56,138 @@ python main.py --show-cache-stats
 }
 ```
 
-### 禁用缓存
+### Disable Caching
 
 ```bash
 python main.py --stock stock.zip --port port.zip --no-cache
 ```
 
-### 清除缓存
+### Clear Cache
 
 ```bash
-# 清除所有缓存
+# Clear all cache
 python main.py --stock stock.zip --port port.zip --clear-cache
 
-# 或使用专用工具
+# Or use the standalone cache manager tool
 python tools/cache_manager.py clean --all
 ```
 
-## 缓存工具
+## Cache Manager Tool
 
-### 查看缓存列表
+### List Cached ROMs
 
 ```bash
 python tools/cache_manager.py list
 ```
 
-### 查看详细统计
+### View Detailed Statistics
 
 ```bash
 python tools/cache_manager.py stats
 ```
 
-### 验证缓存完整性
+### Verify Cache Integrity
 
 ```bash
-# 仅验证
+# Verify only
 python tools/cache_manager.py verify
 
-# 验证并修复
+# Verify and repair
 python tools/cache_manager.py verify --fix
 ```
 
-## 缓存结构
+## Cache Structure
 
 ```
 .cache/portroms/
-├── metadata.json              # 全局缓存元数据
-├── a1b2c3d4e5f6.../          # ROM哈希目录（前16字符）
-│   ├── partitions/           # 分区缓存
-│   │   ├── system/          # system分区
+├── metadata.json              # Global cache metadata
+├── a1b2c3d4e5f6.../          # ROM hash directory (first 16 characters)
+│   ├── partitions/           # Partition cache
+│   │   ├── system/          # system partition
 │   │   │   ├── app/
 │   │   │   ├── framework/
 │   │   │   └── cache_metadata.json
-│   │   ├── product/         # product分区
+│   │   ├── product/         # product partition
 │   │   └── ...
-│   └── apks/                 # APK修改缓存
+│   └── apks/                 # APK modification cache
 │       └── MIUIPackageInstaller_<hash>_InstallerModifier_v1.0/
 │           ├── modified.apk
 │           └── metadata.json
 └── ...
 ```
 
-## 工作原理
+## How It Works
 
-### 分区缓存流程
-
-```
-提取阶段:
-  1. 检查全局缓存中是否有所需分区
-  2. 如有，直接从缓存恢复到工作目录
-  3. 如无，正常提取并保存到缓存
-
-修改阶段:
-  1. 在修改后的分区上执行修改
-  2. （未来）保存修改后的完整分区到缓存
-```
-
-### APK缓存流程
+### Partition Cache Workflow
 
 ```
-APK修改:
-  1. 计算APK缓存键（APK哈希+修改器类名+版本）
-  2. 检查缓存中是否存在修改后的APK
-  3. 如有，直接复制缓存的APK到目标位置
-  4. 如无，执行反编译、修改、编译流程
-  5. 保存修改后的APK到缓存
+Extraction Phase:
+  1. Check global cache for requested partition.
+  2. If found, restore directly from cache into work directory.
+  3. If missing, extract normally and save into cache.
+
+Modification Phase:
+  1. Execute modifications on the extracted partition.
+  2. (Future) Cache fully modified partitions.
 ```
 
-## 性能对比
+### APK Cache Workflow
 
-| 场景 | 无缓存 | 有缓存 | 节省时间 |
+```
+APK Modification:
+  1. Compute APK cache key (APK hash + modifier class name + version).
+  2. Check cache for modified APK.
+  3. If found, copy cached APK directly to destination.
+  4. If missing, decompile, patch, and recompile.
+  5. Save modified APK into cache.
+```
+
+## Performance Comparison
+
+| Scenario | Without Cache | With Cache | Time Saved |
 |------|--------|--------|---------|
-| 首次移植 | 15分钟 | 15分钟 | 0% |
-| 同Port ROM换机型 | 15分钟 | 5-8分钟 | 50-70% |
-| 仅修改配置重打包 | 15分钟 | 3-5分钟 | 70-80% |
+| First port | 15 min | 15 min | 0% |
+| Same Port ROM, different device | 15 min | 5-8 min | 50-70% |
+| Config changes only (repack) | 15 min | 3-5 min | 70-80% |
 
-## 缓存失效策略
+## Invalidation Policies
 
-缓存会在以下情况下自动失效：
+Cache invalidates automatically under the following conditions:
 
-1. **ROM文件变化**: 文件哈希不匹配
-2. **缓存版本升级**: 缓存格式版本变化
-3. **APK修改器版本变化**: `cache_version`属性变化
-4. **完整性检查失败**: 文件数量或内容不匹配
+1. **ROM File Changes**: File hash mismatch.
+2. **Cache Version Upgrades**: Format version bump.
+3. **APK Modifier Version Changes**: `cache_version` attribute bump.
+4. **Integrity Failures**: Missing files or corrupted checksums.
 
-## 注意事项
+## Important Notes
 
-1. **缓存位置**: 默认存储在项目根目录的 `.cache/portroms/`，确保有足够磁盘空间
-2. **并发安全**: 文件锁机制确保多进程安全，但同一ROM的并发修改仍可能冲突
-3. **清理策略**: 目前需要手动清理缓存，未来将支持自动清理策略
-4. **设备特定文件**: Vendor/ODM分区、Firmware镜像不会缓存（设备特定）
+1. **Location**: Defaults to `.cache/portroms/` in the project root. Ensure sufficient disk space.
+2. **Concurrency**: File locks protect against race conditions, but concurrent modifications of the same ROM may still conflict.
+3. **Cleanup**: Manual cleanup for now; automated policies planned.
+4. **Device-Specific Files**: Vendor/ODM partitions and firmware images are never cached as they are device-specific.
 
-## 故障排除
+## Troubleshooting
 
-### 缓存未命中
+### Cache Misses
 
-如果缓存一直未命中，检查：
-1. `--no-cache` 参数是否被误用
-2. ROM文件是否有变化（哈希不同）
-3. 缓存目录权限是否正确
+If cache misses occur unexpectedly, check:
+1. Ensure `--no-cache` was not accidentally passed.
+2. Verify ROM file hash has not changed.
+3. Verify cache directory write permissions.
 
-### 清理损坏的缓存
+### Repair Corrupted Cache
 
 ```bash
-# 验证并自动修复
+# Verify and auto-repair
 python tools/cache_manager.py verify --fix
 
-# 或清除所有缓存重新开始
+# Or clear all cache to start fresh
 python tools/cache_manager.py clean --all
 ```
 
-## 未来计划
+## Roadmap
 
-- [ ] 自动缓存大小限制和LRU清理
-- [ ] 缓存压缩以节省磁盘空间
-- [ ] 分布式缓存支持（多机器共享）
-- [ ] 缓存预加载和后台同步
+- [ ] Automatic cache size limits and LRU eviction.
+- [ ] Compressed caching to save disk storage.
+- [ ] Distributed cache support across multiple worker machines.
+- [ ] Background cache preloading and synchronization.
