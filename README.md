@@ -1,86 +1,84 @@
-# 🚀 HyperOS 移植工具 (Python 版)
+# 🚀 HyperOS Porting Tool (Python)
 
-[![GitHub stars](https://img.shields.io/github/stars/toraidl/HyperOS-Port-Python?style=flat)](https://github.com/toraidl/HyperOS-Port-Python/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/toraidl/HyperOS-Port-Python?style=flat)](https://github.com/toraidl/HyperOS-Port-Python/network/members)
+[![GitHub stars](https://img.shields.io/github/stars/AndreGamaliel/HyperOS-Port-Python?style=flat)](https://github.com/AndreGamaliel/HyperOS-Port-Python/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/AndreGamaliel/HyperOS-Port-Python?style=flat)](https://github.com/AndreGamaliel/HyperOS-Port-Python/network/members)
 
-**中文 (Chinese)** | [English](README_EN.md)
+**English** | [中文 (Chinese)](README_ZH.md)
 
-一个面向小米/红米设备的 HyperOS ROM 移植工具。覆盖常见移植流程：解包、补丁处理、功能适配、重新打包与 OTA 升级包产出。
-
----
-
-## 🌟 核心特性
-
-- 🛠️ **流程自动化**: 从底包/移植包 ZIP 到可刷入产物的完整流程。
-- 💉 **系统补丁**: 按规则修改固件、系统、框架和 ROM 属性。
-- 🧬 **GKI 支持**: 针对 GKI 2.0 (5.10+) 及标准 GKI 设备提供 KernelSU 注入能力。
-- 🔓 **AVB 禁用**: 通过直接修改 `vbmeta.img` 禁用 Android 验证启动 (AVB)，避免修改 fstab 导致的 DSU 无法使用问题。
-- 🔐 **自定义 AVB 验证链**: 可基于 stock `vbmeta/vbmeta_system` 自动重建 AVB 拓扑，为目标镜像补齐 footer、重建 `vbmeta*.img` 并执行链路校验；同时对非动态分区应用物理分区上限保护，避免 OTA 写入超分区。
-- 🚀 **Wild Boost（狂暴引擎）**: 将红米机型的狂暴引擎适配并移植到小米机型；要求内核版本一致，当前已验证小米 12S 与小米 13。
-- 🧩 **模块化配置**: 通过简单的 JSON 文件开启/关闭功能（AOD、AI 引擎等）。
-- 🌏 **EU 本地化**: 为 Global/EU 底包恢复国内特有功能（NFC、小米钱包、小爱同学）。
-- 📦 **多格式支持**: 支持生成 `payload.bin` (Recovery/OTA) 或 `super.img` (Hybrid/Fastboot) 格式。
-- 🔒 **官方 OTA 升级链路**: 产出兼容官方 OTA 格式的包，可通过官方升级 App 执行 AB 升级；出现问题时可回滚。
+A HyperOS ROM porting tool for Xiaomi/Redmi devices. It covers the common workflow: unpacking, patch processing, feature adaptation, repacking, and OTA package output.
 
 ---
 
-## 📱 机型兼容性
+## 🌟 Key Features
 
-### 支持机型
-- 理论上支持内核版本 **5.10 及以上 (GKI 2.0+)** 的 **高通平台** 小米/红米设备。
-- 支持在 `devices/<机型代码>/` 中自定义机型覆盖规则。
-
-### Wild Boost 兼容设备
-- **小米 12S (mayfly)**: 内核 5.10 - 安装到 vendor_boot ramdisk
-- **小米 13 (fuxi)**: 内核 5.15 - 安装到 vendor_dlkm
-
-### 已验证机型
-- **底包 (Stock):**
-  - 小米 13 (HyperOS 2.0/3.0)
-  - 小米 12S (HyperOS 3.0 / A15)
-  - 小米 17 (HyperOS 3.0 / A16 / KMI 6.12)
-- **移植来源:**
-  - 小米 14 / 15 / 17
-  - 红米 K90 / K90 Pro
-  - 支持 HyperOS CN 3.0 正式版及测试版
+- 🛠️ **Workflow Automation**: From stock/port ZIPs to flashable output in one pipeline.
+- 💉 **System Patching**: Rule-based modifications for firmware, system, framework, and ROM properties.
+- 🧬 **GKI Support**: KernelSU injection support for GKI 2.0 (5.10+) and standard GKI devices.
+- 🔓 **AVB Disabling**: Disables Android Verified Boot (AVB) by directly patching `vbmeta.img`, avoiding DSU compatibility issues caused by fstab modifications.
+- 🔐 **Custom AVB Verification Chain**: Rebuilds AVB topology from stock `vbmeta/vbmeta_system`, re-signs required image footers, regenerates `vbmeta*.img`, and verifies the chain; also enforces physical partition caps for non-dynamic partitions to prevent OTA ENOSPC at flash time.
+- 🚀 **Wild Boost (Rage Engine)**: Ports the Redmi-specific rage engine to Xiaomi targets; requires matching kernel versions. Currently validated on Xiaomi 12S and Xiaomi 13.
+- 🧩 **Modular Configuration**: Toggle features (AOD, AI Engine, etc.) via simple JSON files.
+- 🌏 **EU Localization**: Restore China-exclusive features (NFC, XiaoAi) to Global/EU bases.
+- 📦 **Multi-Format Support**: Generate `payload.bin` (Recovery/OTA) or `super.img` (Hybrid/Fastboot) formats.
+- 🔒 **Official OTA Upgrade Path**: Produces packages compatible with the official OTA format, enabling AB upgrades via the official Updater app; rollback is available if issues occur.
 
 ---
 
-## ⚙️ 前置条件
+## 📱 Compatibility
+
+### Target & Supported Devices
+- **Poco F7 (onyx)**: Snapdragon 8s Gen 4 (SM8735), Kernel 6.6+ (GKI 2.0+). Pre-configured in `devices/onyx/`.
+- Supports **Xiaomi/Redmi/Poco** devices with **Qualcomm** processors (Kernel 5.10+ / GKI 2.0+).
+- Custom overrides available in `devices/<device_code>/`.
+
+### Tested & Verified
+- **Base (Stock):**
+  - Poco F7 (onyx - HyperOS 2.0 / A15)
+  - Xiaomi 13 (HyperOS 2.0/3.0)
+  - Xiaomi 12S (HyperOS 3.0 / A15)
+  - Xiaomi 17 (HyperOS 3.0 / A16 / KMI 6.12)
+- **Port Sources:**
+  - Xiaomi 14 / 15 / 17
+  - Redmi K90 / K90 Pro
+  - Supports HyperOS CN 3.0 (Stable & Beta)
+
+---
+
+## ⚙️ Prerequisites
 
 - **Python 3.10+**
-- **Linux 环境** (推荐使用 Ubuntu 20.04+)
-- **Sudo 权限** (用于挂载/卸载镜像)
-- **OTA 工具**: 已内置在 `otatools/` 目录中。
+- **Linux Environment** (Ubuntu 20.04+ recommended)
+- **Sudo Access** (required for partition mounting/unmounting)
+- **OTA Tools**: Included in the `otatools/` directory.
 
 ---
 
-## 🚀 快速开始
+## 🚀 Quick Start
 
-### 1. 安装
+### 1. Installation
 ```bash
-git clone https://github.com/yourusername/HyperOS-Port-Python.git
+git clone https://github.com/AndreGamaliel/HyperOS-Port-Python.git
 cd HyperOS-Port-Python
-# 安装依赖
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-### 开发环境设置 (可选)
-如果你想参与贡献或运行测试：
+### Development Setup (Optional)
+If you want to contribute or run tests:
 ```bash
-# 创建本地虚拟环境
+# Create a local virtual environment
 python3 -m venv .venv
 
-# 安装开发和测试依赖
+# Install development and test dependencies
 .venv/bin/python -m pip install -r requirements-dev.txt -r requirements-test.txt
 
-# 运行测试
+# Run tests
 .venv/bin/python -m pytest -q
 
-# 代码格式化
+# Code formatting
 .venv/bin/python -m black src tests main.py
 
-# 代码检查（与 CI 对齐）
+# Linting
 .venv/bin/python -m ruff check \
   main.py \
   tests \
@@ -113,76 +111,77 @@ python3 -m venv .venv
   src/core/modifiers/transaction.py \
   src/core/modifiers/unified_modifier.py
 
-# Curated 类型检查
+# Curated type checking for the refactored runtime path
 .venv/bin/python -m mypy --config-file mypy-curated.ini
+
 ```
 
-### 2. 基本用法
-准备好底包 (Stock ROM) 和移植包 (Port ROM) 的 ZIP 文件（官改模式仅需底包），然后运行：
+### 2. Basic Usage
+Prepare your Stock ROM and Port ROM ZIP files (or just Stock ROM for Official Modification), then run:
 
-**OTA/Recovery 模式 (默认):**
+**OTA/Recovery Mode (Default):**
 ```bash
-sudo python3 main.py --stock <底包路径> --port <移植包路径>
+sudo python3 main.py --stock <path_to_stock_zip> --port <path_to_port_zip>
 ```
 
-**官改模式 (仅修改底包):**
+**Official Modification Mode (Modify Stock ROM only):**
 ```bash
-sudo python3 main.py --stock <底包路径>
+sudo python3 main.py --stock <path_to_stock_zip>
 ```
 
-**Hybrid/Fastboot 模式 (Super Image):**
+**Hybrid/Fastboot Mode (Super Image):**
 ```bash
-sudo python3 main.py --stock <底包路径> --port <移植包路径> --pack-type super
+sudo python3 main.py --stock <path_to_stock_zip> --port <path_to_port_zip> --pack-type super
 ```
 
 ---
 
-## 🛠️ 参数说明
+## 🛠️ Advanced Usage
 
-### 常用命令行参数
+### Arguments Reference
 
-| 参数 | 说明 | 默认值 |
+| Argument | Description | Default |
 | :--- | :--- | :--- |
-| `--stock` | **(必需)** 底包 (Stock ROM) 路径 | 无 |
-| `--port` | **(可选)** 移植包 (Port ROM) 路径。如果省略，则运行 **官改模式**。 | 无 |
-| `--pack-type` | 打包格式: `payload` 或 `super` | `payload` |
-| `--fs-type` | 文件系统类型：`erofs` 或 `ext4` | 从 config 读取 |
-| `--ksu` | 注入 KernelSU 到 `init_boot`/`boot` | 从 config 读取 |
-| `--work-dir` | 解包和修补的工作目录 | `build` |
-| `--clean` | 开始前清理工作目录 | `false` |
-| `--debug` | 开启调试日志 | `false` |
-| `--eu-bundle` | EU 本地化资源包 (ZIP) 的路径或 URL | 无 |
-| `--preflight-only` | 仅执行预检并输出报告，然后退出 | `false` |
-| `--skip-preflight` | 跳过预检阶段（不建议） | `false` |
-| `--preflight-strict` | 将风险项也视为失败项（用于严格阻断） | `false` |
-| `--preflight-report` | 预检 JSON 报告输出路径 | `build/preflight-report.json` |
-| `--enable-snapshots` | 在关键阶段保存工作目录快照 | `false` |
-| `--snapshot-dir` | 快照目录（未设置时使用 `<work-dir>/snapshots`） | `null` |
-| `--rollback-to-snapshot` | 从指定快照恢复目标工作目录并退出 | `null` |
-| `--enable-diff-report` | 生成产物差异报告（前后文件/属性/APK变化） | `false` |
-| `--diff-report` | 差异报告 JSON 输出路径 | `build/diff-report.json` |
-| `--custom-avb-chain` | 启用“自定义 AVB 验证链”（按 stock AVB 拓扑重建 footer/vbmeta 并校验） | `false` |
-| `--resume-from-packer` | 从已保存的 repack 检查点恢复，直接进入打包阶段 | `false` |
+| `--stock` | **(Required)** Path to the Stock ROM (Base) | N/A |
+| `--port` | **(Optional)** Path to the Port ROM. If omitted, tool runs in **Official Modification mode**. | N/A |
+| `--pack-type` | Output format: `payload` or `super` | from config |
+| `--fs-type` | Filesystem type: `erofs` or `ext4` | from config |
+| `--ksu` | Inject KernelSU into `init_boot`/`boot` | from config |
+| `--work-dir` | Working directory for extraction/patching | `build` |
+| `--clean` | Clean work directory before starting | `false` |
+| `--debug` | Enable verbose debug logging | `false` |
+| `--eu-bundle` | Path/URL to EU Localization Bundle ZIP | N/A |
+| `--preflight-only` | Run preflight checks only, emit report, then exit | `false` |
+| `--skip-preflight` | Skip the preflight phase (not recommended) | `false` |
+| `--preflight-strict` | Treat risk findings as failures (strict gating) | `false` |
+| `--preflight-report` | Output path for preflight JSON report | `build/preflight-report.json` |
+| `--enable-snapshots` | Capture workspace snapshots at key workflow stages | `false` |
+| `--snapshot-dir` | Snapshot directory (defaults to `<work-dir>/snapshots`) | `null` |
+| `--rollback-to-snapshot` | Restore target workspace from a named snapshot and exit | `null` |
+| `--enable-diff-report` | Generate artifact diff report (files/props/APK changes) | `false` |
+| `--diff-report` | Output path for artifact diff report JSON | `build/diff-report.json` |
+| `--custom-avb-chain` | Enable custom AVB chain rebuild (stock-profiled footer/vbmeta rebuild + verification) | `false` |
+| `--resume-from-packer` | Resume from a saved repack checkpoint and jump directly to packaging | `false` |
 
 ---
 
-## 🔧 配置系统
+## 🔧 Configuration System
 
-本项目采用模块化的 JSON 配置系统。
+The tool uses a modular JSON-based configuration system.
 
-### 1. 自动设备配置 (Auto-Configuration)
-工具支持从底包 (Stock ROM) 自动提取设备信息并创建设备配置。
+### 1. Auto-Configuration
+The tool supports automatic device configuration extraction from the Stock ROM.
 
-- **触发条件**: 当 `devices/<机型代码>/` 目录不存在时自动触发
-- **数据来源**: 通过 `payload-dumper --json` 提取分区信息和元数据
-- **生成文件**:
-  - `config.json` - 设备基本配置
-  - `features.json` - 功能开关和属性
-  - `replacements.json` - 资源替换规则
-  - `partition_info.json` - 分区布局信息（动态分区列表、固件分区列表、super 大小）
-  - 启用 `--custom-avb-chain` 时会自动补全 AVB 固化字段（`physical_partition_sizes`、`avb_*_partitions`、`avb_strict_partitions`）
+- **Trigger**: Automatically triggered when `devices/<device_code>/` directory does not exist
+- **Data Source**: Extracts partition info and metadata via `payload-dumper --json`
+- **Generated Files**:
+  - `config.json` - Device base configuration
+  - `features.json` - Feature toggles and properties
+  - `replacements.json` - Resource replacement rules
+  - `partition_info.json` - Partition layout (dynamic partitions, firmware partitions, super size)
+  - With `--custom-avb-chain`, AVB-persistent fields are auto-synced (`physical_partition_sizes`, `avb_*_partitions`, `avb_strict_partitions`)
 
-**示例生成的 partition_info.json**:
+**Example generated partition_info.json**:
 ```json
 {
     "device_code": "myron",
@@ -205,10 +204,10 @@ sudo python3 main.py --stock <底包路径> --port <移植包路径> --pack-type
 }
 ```
 
-### 2. 设备配置 (`config.json`)
-控制设备特定的设置，包括 wild_boost、打包类型和 KSU。
-- **位置**: `devices/<机型代码>/config.json`
-- **优先级**: CLI 参数 > `config.json` > 默认值
+### 2. Device Configuration (`config.json`)
+Control device-specific settings including wild_boost, pack type, and KSU.
+- **Location**: `devices/<device_code>/config.json`
+- **Priority**: CLI args > `config.json` > defaults
 
 ```json
 {
@@ -225,31 +224,31 @@ sudo python3 main.py --stock <底包路径> --port <移植包路径> --pack-type
 }
 ```
 
-**CLI 覆盖示例:**
+**CLI Overrides:**
 ```bash
-# 覆盖打包类型和文件系统
+# Override pack type and filesystem
 sudo python3 main.py --stock stock.zip --port port.zip --pack-type super --fs-type ext4
 ```
 
-### 3. 狂暴引擎支持
-根据内核版本自动安装性能增强模块。
+### 3. Wild Boost Support
+Automatically installs performance boost modules based on kernel version.
 
-**功能特性:**
-- 📌 **自动检测**: 检测内核版本 (5.10 / 5.15)
-- 📌 **智能安装**:
-  - 内核 5.10: 安装到 `vendor_boot` ramdisk
-  - 内核 5.15: 安装到 `vendor_dlkm`
-- 📌 **AVB 自动禁用**: 防止修改后无法启动
-- 📌 **设备伪装**: HexPatch `libmigui.so`
-- 📌 **备用方案**: `persist.sys.feas.enable=true` 用于新系统
+**Features:**
+- 📌 **Auto-detection**: Detects kernel version (5.10 / 5.15)
+- 📌 **Smart Installation**:
+  - Kernel 5.10: Installs to `vendor_boot` ramdisk
+  - Kernel 5.15: Installs to `vendor_dlkm`
+- 📌 **AVB Auto-disable**: Prevents bootloop after modification
+- 📌 **Device Spoofing**: HexPatch for `libmigui.so`
+- 📌 **Fallback**: `persist.sys.feas.enable=true` for newer systems
 
-**支持设备:**
-- 小米 12S (mayfly) - 内核 5.10
-- 小米 13 (fuxi) - 内核 5.15
+**Supported Devices:**
+- Xiaomi 12S (mayfly) - Kernel 5.10
+- Xiaomi 13 (fuxi) - Kernel 5.15
 
-### 4. 特性开关 (`features.json`)
-管理每个设备的系统特性和属性。
-- **位置**: `devices/<机型代码>/features.json`
+### 4. Feature Toggles (`features.json`)
+Manage system features and properties per device.
+- **Location**: `devices/<device_code>/features.json`
 
 ```json
 {
@@ -263,12 +262,12 @@ sudo python3 main.py --stock stock.zip --port port.zip --pack-type super --fs-ty
 }
 ```
 
-### 5. 资源 overlays (`replacements.json`)
-自动化文件/目录替换（如 overlays、音频配置等）。
+### 5. Resource Overlays (`replacements.json`)
+Automate file/directory replacements (e.g., overlays, audio configs).
 ```json
 [
     {
-        "description": "系统 Overlays",
+        "description": "System Overlays",
         "type": "file",
         "search_path": "product",
         "files": ["DevicesOverlay.apk"]
@@ -278,91 +277,89 @@ sudo python3 main.py --stock stock.zip --port port.zip --pack-type super --fs-ty
 
 ---
 
-## 🏮 EU 本地化 (恢复国内功能)
+## 🏮 EU Localization (China Feature Restoration)
 
-为 xiaomi.eu ROM 恢复 **中国国内特有的功能** (NFC, 小米钱包, 小爱同学)，同时保持 "国际版" 伪装。
+Restores **China-exclusive features** (NFC, Mi Wallet, XiaoAi) to EU/Global ROMs while maintaining "International" status.
 
-1. **启用**: 在 `features.json` 中设置 `"enable_eu_localization": true`。
-2. **生成资源包**:
+1. **Enable**: Set `"enable_eu_localization": true` in `features.json`.
+2. **Generate Bundle**:
    ```bash
-   # Generate ZIP bundle (Default)
    python3 tools/generate_eu_bundle.py --rom <CN_ROM.zip> --config devices/common/eu_bundle_config.json
-
-   # Generate folder only (For manual modification)
-   python3 tools/generate_eu_bundle.py --rom <CN_ROM.zip> --config devices/common/eu_bundle_config.json --no-zip
    ```
-3. **应用**:
+3. **Apply**:
    ```bash
    sudo python3 main.py ... --eu-bundle eu_localization_bundle_v1.0.zip
    ```
 
 ---
 
-## 📂 项目结构
+## 📂 Project Structure
 
 ```text
 HyperOS-Port-Python/
-├── src/                       # 核心 Python 源代码
-│   ├── core/                  # 核心 ROM 处理逻辑
-│   │   ├── modifiers/         # ROM 修改系统
-│   │   │   ├── framework/     # 框架级补丁 (模块化)
-│   │   │   │   ├── patches.py     # Smali 补丁定义
-│   │   │   │   ├── base.py        # 框架修改器基类
-│   │   │   │   ├── tasks.py       # 具体修改任务
-│   │   │   │   └── modifier.py    # 主框架修改器
-│   │   │   └── plugins/       # APK 修改插件系统
-│   │   ├── rom/               # ROM 包处理 (模块化)
-│   │   │   ├── package.py     # RomPackage 类
-│   │   │   ├── extractors.py  # ROM 提取方法
-│   │   │   ├── utils.py       # ROM 工具函数
-│   │   │   └── constants.py   # 分区列表和枚举
-│   │   ├── packer.py          # 镜像重打包逻辑
-│   │   ├── context.py         # 移植上下文管理
-│   │   └── props.py           # 属性管理
-│   ├── modules/               # APK 级别修改模块
-│   └── utils/                 # Shell 和文件工具
-│       ├── lpunpack.py        # lpunpack 的 Python 实现，增强兼容性
+├── src/                       # Core Python source code
+│   ├── core/                  # Core ROM processing logic
+│   │   ├── modifiers/         # ROM modification system
+│   │   │   ├── framework/     # Framework-level patches (modular)
+│   │   │   │   ├── patches.py     # Smali patch definitions
+│   │   │   │   ├── base.py        # Framework modifier base class
+│   │   │   │   ├── tasks.py       # Specific modification tasks
+│   │   │   │   └── modifier.py    # Main framework modifier
+│   │   │   └── plugins/       # Plugin system for APK modifications
+│   │   ├── rom/               # ROM package handling (modular)
+│   │   │   ├── package.py     # RomPackage class
+│   │   │   ├── extractors.py  # ROM extraction methods
+│   │   │   ├── utils.py       # ROM utilities
+│   │   │   └── constants.py   # Partition lists and enums
+│   │   ├── packer.py          # Image repacking logic
+│   │   ├── context.py         # Porting context management
+│   │   └── props.py           # Property management
+│   ├── modules/               # APK-level modification modules
+│   └── utils/                 # Shell and file utilities
+│       ├── lpunpack.py        # Python implementation of lpunpack for compatibility
 │       └── ...
-├── devices/                   # 特定机型的配置和 overlay
-├── otatools/                  # Android OTA 二进制文件 (bin, lib64)
-├── tests/                     # 单元测试
-├── out/                       # 最终生成的 ROM 输出目录
-├── tools/                     # 辅助工具
-├── requirements.txt           # 生产环境依赖
-├── requirements-dev.txt       # 开发环境依赖
-└── pyproject.toml            # Python 项目配置
+├── devices/                   # Device-specific configs & overlays
+├── otatools/                  # Android OTA binaries (bin, lib64)
+├── tests/                     # Unit tests
+├── out/                       # Final generated ROM outputs
+├── tools/                     # Auxiliary tools
+├── requirements.txt           # Production dependencies
+├── requirements-dev.txt       # Development dependencies
+└── pyproject.toml            # Python project configuration
 ```
 
 ---
 
-## 🧪 测试
+## 🧪 Testing
 
-使用 pytest 运行测试套件：
+Run the test suite with pytest:
 
 ```bash
-# 运行所有测试
-pytest tests/ -v
+# Run all tests
+.venv/bin/python -m pytest -q
 
-# 运行特定测试文件
-pytest tests/core/test_config_loader.py -v
+# Run specific test file
+.venv/bin/python -m pytest tests/core/test_config_loader.py -q
 
-# 运行并生成覆盖率报告
-pytest tests/ --cov=src --cov-report=html
+# Run with coverage
+.venv/bin/python -m pytest tests/ --cov=src --cov-report=html
 ```
 
 ---
 
-## 🎨 代码质量
+## 🎨 Code Quality
 
-本项目使用以下工具维护代码质量：
+This project uses several tools to maintain code quality:
 
-| 工具 | 用途 | 命令 |
-|------|------|------|
-| **Black** | 代码格式化 | `.venv/bin/python -m black src tests main.py` |
-| **Ruff** | 快速 Python 检查 | `.venv/bin/python -m ruff check main.py tests src/app src/core/cache_manager.py src/core/packer.py src/core/conditions.py src/core/context.py src/core/props.py src/core/config_loader.py src/core/config_merger.py src/core/rom/package.py src/core/rom/extractors.py src/core/rom/utils.py src/core/monitoring/__init__.py src/core/monitoring/console_ui.py src/core/monitoring/plugin_integration.py src/core/monitoring/workflow_integration.py src/core/rom_metadata.py src/core/tooling.py src/core/workspace.py src/core/modifiers/__init__.py src/core/modifiers/base_modifier.py src/core/modifiers/framework/base.py src/core/modifiers/framework/modifier.py src/core/modifiers/framework/tasks.py src/core/modifiers/plugin_system.py src/core/modifiers/plugins/feature_unlock.py src/core/modifiers/smali_args.py src/core/modifiers/transaction.py src/core/modifiers/unified_modifier.py` |
-| **MyPy（Curated）** | 重构运行链路的类型检查 | `.venv/bin/python -m mypy --config-file mypy-curated.ini` |
+| Tool | Purpose | Command |
+|------|---------|---------|
+| **Black** | Code formatting | `.venv/bin/python -m black src tests main.py` |
+| **Ruff** | Fast Python linting | `.venv/bin/python -m ruff check main.py tests src/app src/core/cache_manager.py src/core/packer.py src/core/conditions.py src/core/context.py src/core/props.py src/core/config_loader.py src/core/config_merger.py src/core/rom/package.py src/core/rom/extractors.py src/core/rom/utils.py src/core/monitoring/__init__.py src/core/monitoring/console_ui.py src/core/monitoring/plugin_integration.py src/core/monitoring/workflow_integration.py src/core/rom_metadata.py src/core/tooling.py src/core/workspace.py src/core/modifiers/__init__.py src/core/modifiers/base_modifier.py src/core/modifiers/framework/base.py src/core/modifiers/framework/modifier.py src/core/modifiers/framework/tasks.py src/core/modifiers/plugin_system.py src/core/modifiers/plugins/feature_unlock.py src/core/modifiers/smali_args.py src/core/modifiers/transaction.py src/core/modifiers/unified_modifier.py` |
+| **MyPy (Curated)** | Type checking for the refactored runtime and the cleaned modifier orchestration modules | `.venv/bin/python -m mypy --config-file mypy-curated.ini` |
 
-### 开发者自检（与 CI 一致）
+### Developer Self-Check
+
+Run the same checks as CI before opening a pull request:
 
 ```bash
 .venv/bin/python -m compileall -q src tests main.py
@@ -401,40 +398,41 @@ pytest tests/ --cov=src --cov-report=html
 .venv/bin/python -m pytest -q
 ```
 
-### 预提交钩子 (可选)
+### Pre-commit Hooks (Optional)
 
-安装预提交钩子以在每次提交前自动检查代码质量：
+Install pre-commit hooks to automatically check code quality before each commit:
 
 ```bash
-# 安装 pre-commit
+# Install pre-commit
 pip install pre-commit
 
-# 安装钩子
+# Install hooks
 pre-commit install
 
-# 手动运行所有文件检查
+# Run manually on all files
 pre-commit run --all-files
 ```
 
 ---
 
-## 🤝 贡献指南
+## 🤝 Contributing
 
-1. Fork 本仓库
-2. 创建功能分支 (`git checkout -b feature/新功能`)
-3. 提交你的修改
-4. 确保测试通过且代码质量检查通过
-5. 提交更改 (`git commit -m 'feat: 添加新功能'`)
-6. 推送到分支 (`git push origin feature/新功能`)
-7. 创建 Pull Request
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Run tests and ensure code quality checks pass
+5. Commit your changes (`git commit -m 'feat: Add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
 
 ---
 
-## 🤝 特别鸣谢
+## 🤝 Acknowledgments
 
-本项目主要由 AI 协作完成，包括 **Gemini 3.1 Pro**、**GPT-5.3**、**KM2.5**、**QWEN3.5** 等模型与助手。
+This project was primarily completed with AI collaboration, including
+**Gemini 3.1 Pro**, **GPT-5.3**, **KM2.5**, **QWEN3.5**, and related assistants.
 
-**特别感谢:**
+**Special Thanks:**
 - [HyperCeiler](https://github.com/ReChronoRain/HyperCeiler/)
 - [OemPorts10T-PIF](https://github.com/Danda420/OemPorts10T-PIF)
 - [FrameworkPatcher](https://github.com/FrameworksForge/FrameworkPatcher)
@@ -442,6 +440,6 @@ pre-commit run --all-files
 
 ---
 
-## 📜 许可证
+## 📜 License
 
-基于 [Unlicense](LICENSE) 发布。完全免费，可任意用于任何用途。
+Released under the [Unlicense](LICENSE). Completely free for any use.
