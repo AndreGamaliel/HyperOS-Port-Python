@@ -660,15 +660,7 @@ class Repacker:
             self.logger.error(f"Failed to generate super.img: {e}")
             return
 
-        self.logger.info("Compressing super.img to super.zst...")
-        zst_path: Path = self.ctx.target_dir / "super.zst"
-        try:
-            self.shell.run(["zstd", "--rm", str(super_img), "-o", str(zst_path)])
-            self.logger.info("Compressed super.zst generated.")
-        except subprocess.CalledProcessError as e:
-            self.logger.warning(f"zstd compression failed: {e}.")
-
-        self._generate_flash_script(zst_path if zst_path.exists() else super_img)
+        self._generate_flash_script(super_img)
 
     def _generate_flash_script(self, super_image_path: Path) -> None:
         """Generate hybrid flashing scripts (Fastboot + Recovery)"""
@@ -688,7 +680,7 @@ class Repacker:
         meta_inf.mkdir(parents=True, exist_ok=True)
 
         self.logger.info(f"Copying {super_image_path.name}...")
-        shutil.copy2(super_image_path, out_path / "super.zst")
+        shutil.copy2(super_image_path, out_path / "super.img")
 
         if self.ctx.repack_images_dir.exists():
             for fw in self.ctx.repack_images_dir.glob("*.img"):
@@ -703,9 +695,6 @@ class Repacker:
                 shutil.copytree(
                     flash_template / "platform-tools-windows", bin_windows, dirs_exist_ok=True
                 )
-            zstd_bin: Path = flash_template / "zstd"
-            if zstd_bin.exists():
-                shutil.copy2(zstd_bin, out_path / "META-INF/zstd")
 
             files_to_process: Dict[str, Path] = {
                 "windows_flash_script.bat": out_path / "windows_flash_script.bat",
@@ -735,17 +724,23 @@ class Repacker:
         )
         final_zip_path: Path = self.out_dir / final_zip_name
 
-        with zipfile.ZipFile(final_zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        with zipfile.ZipFile(
+            final_zip_path, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True
+        ) as zf:
             for root, _dirs, files in os.walk(out_path):
                 for file in files:
                     file_path = Path(root) / file
                     arcname = file_path.relative_to(out_path)
-                    if file == "super.zst":
+                    if file == "super.img":
                         zf.write(file_path, arcname, compress_type=zipfile.ZIP_STORED)
                     else:
                         zf.write(file_path, arcname)
 
-        md5: str = hashlib.md5(open(final_zip_path, "rb").read()).hexdigest()[:10]
+        md5_hash = hashlib.md5()
+        with open(final_zip_path, "rb") as f:
+            for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                md5_hash.update(chunk)
+        md5: str = md5_hash.hexdigest()[:10]
         prefix = build_rom_filename_prefix(self.ctx)
         device_tag = build_rom_filename_device_tag(self.ctx)
         renamed_zip_name: str = f"{prefix}{device_tag}_Hybrid_{self.ctx.target_rom_version}_{self.ctx.security_patch}_{md5}_{timestamp}.zip"
@@ -769,8 +764,10 @@ class Repacker:
     def _patch_script_for_a_only(self, script_path: Path) -> None:
         """Remove _a/_b references for A-only devices (Fastboot)"""
         content: str = script_path.read_text(encoding="utf-8", errors="ignore")
-        content = content.replace("_a", "").replace("_b", "")
-        new_lines: List[str] = [line for line in content.splitlines() if "_b" not in line]
+        content = re.sub(r"_a\b", "", content)
+        new_lines: List[str] = [
+            line for line in content.splitlines() if not re.search(r"_b\b", line)
+        ]
         script_path.write_text("\n".join(new_lines), encoding="utf-8")
 
     def _patch_update_binary_for_a_only(self, script_path: Path) -> None:
@@ -811,7 +808,13 @@ class Repacker:
             elif fw == "dspso.bin":
                 part = "dsp"
 
-            if "dtbo" in fw or "cust" in fw or fw == "boot.img":
+            if (
+                "dtbo" in fw
+                or "cust" in fw
+                or fw == "boot.img"
+                or part in content
+                or fw in content
+            ):
                 continue
 
             if self.ctx.is_ab_device:
@@ -844,6 +847,15 @@ class Repacker:
         is_windows: bool = script_path.suffix == ".bat"
         insertion: List[str] = []
 
+        handled_script_partitions = {
+            "dtbo", "init_boot", "vendor_boot", "recovery", "vbmeta", "vbmeta_system",
+            "vm-bootsys", "pvmfw", "modem", "modemfirmware", "dsp", "bluetooth", "xbl",
+            "xbl_config", "xbl_ramdump", "tz", "hyp", "uefi", "uefisecapp", "keymaster",
+            "qupfw", "devcfg", "featenabler", "cpucp", "cpucp_dtb", "aop", "aop_config",
+            "abl", "shrm", "soccp_debug", "soccp_dcd", "spuservice", "imagefv",
+            "countrycode", "idmanager", "multiimgqti", "boot",
+        }
+
         for fw in fw_files:
             part: str = fw.split(".")[0]
             if fw == "uefi_sec.mbn":
@@ -858,7 +870,14 @@ class Repacker:
                 part = "bluetooth"
             elif fw == "dspso.bin":
                 part = "dsp"
-            if "dtbo" in fw or "cust" in fw or fw == "boot.img":
+
+            if "cust" in fw:
+                continue
+
+            # Skip partitions already handled by the flash script loop
+            if fw.endswith(".img") and part in handled_script_partitions:
+                continue
+            if fw in content:
                 continue
 
             if self.ctx.is_ab_device:
