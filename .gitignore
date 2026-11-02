@@ -19,7 +19,12 @@ wheels/
 *.egg
 MANIFEST
 
-# Virtual Environment
+# Tokens and secrets
+*token*
+*Token*
+*.token
+*.pem
+*.key
 .env
 .venv
 .venv/
