@@ -65,7 +65,7 @@ checkDevice() {
 
 [ -d /tmp ] && rm -rf /tmp
 mkdir -p /tmp
-unzip "$ZIPFILE" META-INF/zstd -d /tmp
+unzip "$ZIPFILE" META-INF/zstd -d /tmp 2>/dev/null || true
 chmod -R 0755 /tmp
 
 checkDevice
@@ -123,7 +123,11 @@ package_extract_file "firmware-update/dtbo.img" "/dev/block/bootdevice/by-name/d
 
 #super cust image
 #package_extract_file "firmware-update/cust.img" "/dev/block/bootdevice/by-name/cust"
-package_extract_zstd "super.zst" "/dev/block/bootdevice/by-name/super"
+if [ -f "/tmp/META-INF/zstd" ] && unzip -l "$ZIPFILE" | grep -q "super.zst"; then
+    package_extract_zstd "super.zst" "/dev/block/bootdevice/by-name/super"
+else
+    package_extract_file "super.img" "/dev/block/bootdevice/by-name/super"
+fi
 
 
 #REMAP_START

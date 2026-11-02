@@ -1,119 +1,188 @@
 @echo off
 cls
 setlocal enabledelayedexpansion
-reg query "HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\Nls\Language" /v InstallLanguage|find "0804">nul&& set LANG=Chinese
-if "%LANG%"=="Chinese" (
-    TITLE windows ˢ���ű� [����ѡ�д��ڣ���ס���Ҽ���س���Ŵ���С���ڻָ�]
-) else (
-    TITLE Windows Flash Script
-)
+chcp 65001 >nul 2>&1
+title Windows Flash Script
 color 3f
+
+echo ========================================================
+echo               HyperOS Flashing Script (Windows)
+echo ========================================================
 echo.
-if exist "super.zst" (
-    if "%LANG%"=="Chinese" (
-        echo. ���ڽ�ѹsuper����,���ĵȴ�
-    ) else (
-        echo. Extracting the super image, wait patiently
+
+set "FASTBOOT=bin\windows\fastboot.exe"
+if not exist "%FASTBOOT%" set "FASTBOOT=fastboot"
+
+set "EXPECTED_DEVICE=device_code"
+
+:: ==========================================================
+:: 1. Check phone codename / type / name
+:: ==========================================================
+echo [1/4] Checking connected device...
+echo Please ensure your device is connected in Fastboot/Bootloader mode.
+echo.
+
+set "PRODUCT="
+for /f "tokens=2 delims=: " %%i in ('"%FASTBOOT%" getvar product 2^>^&1 ^| findstr /r /c:"^product:"') do (
+    set "PRODUCT=%%i"
+)
+
+if "%PRODUCT%"=="" (
+    echo [WARNING] No device detected or unable to read device codename.
+    echo Please make sure your device is connected in Fastboot mode with drivers installed.
+    echo.
+    set /p "RETRY_CHOICE=Do you want to continue anyway? (y/n): "
+    if /i "!RETRY_CHOICE!" neq "y" (
+        echo Flashing aborted by user.
+        pause
+        exit /b 1
     )
-    bin\windows\zstd.exe --rm -d super.zst -o super.img
-    if not "%errorlevel%" == "0" (
-        if "%LANG%"=="Chinese" (
-            echo. ת��ʧ��,��������˳�
-        ) else (
-            echo. Conversion failed. Press any key to exit
+) else (
+    echo Detected device codename : !PRODUCT!
+    echo Expected ROM codename    : %EXPECTED_DEVICE%
+    echo.
+    if /i "!PRODUCT!" neq "%EXPECTED_DEVICE%" (
+        echo [WARNING] Device codename mismatch!
+        echo ROM is designed for [%EXPECTED_DEVICE%], but detected device is [!PRODUCT!].
+        set /p "MISMATCH_CHOICE=Are you sure you want to continue anyway? (y/n): "
+        if /i "!MISMATCH_CHOICE!" neq "y" (
+            echo Flashing aborted by user.
+            pause
+            exit /b 1
         )
-        pause >nul 2>nul
-        exit
+    ) else (
+        echo [OK] Device codename verified successfully.
     )
 )
+echo.
 
-if "%LANG%"=="Chinese" (
-    echo.
-    echo. 1. ��������ˢ��
-    echo.
-    echo. 2. ˫��ˢ��
-    echo.
-    set /p input=��ѡ��-Ĭ��ѡ��1,�س�ִ��:
+:: ==========================================================
+:: 2. Ask user whether to format data or not
+:: ==========================================================
+echo [2/4] User Data Format Options:
+echo.
+echo   1. Keep user data (Dirty flash / Update) [Default]
+echo   2. Format data    (Clean flash - wipes userdata and metadata)
+echo.
+set "FORMAT_CHOICE=1"
+set /p "FORMAT_CHOICE=Please select [1 or 2, default is 1]: "
+
+if "%FORMAT_CHOICE%"=="2" (
+    echo Option selected: [2] Format user data.
 ) else (
-    echo.
-    echo. 1. Preserve user data during flashing
-    echo.
-    echo. 2. Wiping data without wiping /data/media
-    echo.
-    set /p input=Please select - 1 is selected by default, and enter to execute:
+    echo Option selected: [1] Keep user data.
+)
+echo.
+
+:: ==========================================================
+:: 3. Flash phone firmware
+:: ==========================================================
+echo [3/4] Flashing firmware and boot partitions...
+echo.
+
+if exist "%~dp0boot.img" (
+    echo Flashing boot...
+    "%FASTBOOT%" flash boot_a "%~dp0boot.img"
+    "%FASTBOOT%" flash boot_b "%~dp0boot.img"
+) else if exist "%~dp0firmware-update\boot.img" (
+    echo Flashing boot...
+    "%FASTBOOT%" flash boot_a "%~dp0firmware-update\boot.img"
+    "%FASTBOOT%" flash boot_b "%~dp0firmware-update\boot.img"
 )
 
-if "%LANG%"=="Chinese" (
-    echo.
-    echo. ������֤��...��ȷ�������豸����Ϊdevice_code�����Ѿ�����fastbootdģʽ adb reboot fastboot��
-
-    echo.
-) else (
-    echo.
-    echo. Validating device...please boot your device into bootloader and make sure your device code is umi
-    echo.
-)
-
-for /f "tokens=2 delims=: " %%i in ('fastboot %* getvar product 2^>^&1 ^| findstr /r /c:"^product: "') do set "product=%%i"
-set "expected_device=device_code"
-if "%LANG%"=="Chinese" (
-    set "msg_mismatch= �豸device_code��ƥ�䡣�����Ƿ��ǽ���fastbootdģʽ"
-    set "msg_continue=���������(y/n):  "
-    set "msgort= �����ѱ��û���ֹ��"
-    set "msg_continue_process=��������..."
-) else (
-    set "msg_mismatch=Mismatching image and device."
-    set "msg_continue=Do you want to continue anyway? (y/n): "
-    set "msgort=Operation aborted by user."
-    set "msg_continue_process=Continuing with the process..."
-)
-
-if /i "!product!" neq "%expected_device%" (
-    echo %msg_mismatch%
-    set /p "choice=%msg_continue%"
-    if /i "!choice!" neq "y" (
-        echo %msgort%
-        exit /B 1
+for %%P in (
+    dtbo
+    init_boot
+    vendor_boot
+    recovery
+    vbmeta
+    vbmeta_system
+    vm-bootsys
+    pvmfw
+    modem
+    modemfirmware
+    dsp
+    bluetooth
+    xbl
+    xbl_config
+    xbl_ramdump
+    tz
+    hyp
+    uefi
+    uefisecapp
+    keymaster
+    qupfw
+    devcfg
+    featenabler
+    cpucp
+    cpucp_dtb
+    aop
+    aop_config
+    abl
+    shrm
+    soccp_debug
+    soccp_dcd
+    spuservice
+    imagefv
+    countrycode
+    idmanager
+    multiimgqti
+) do (
+    if exist "%~dp0firmware-update\%%P.img" (
+        echo Flashing %%P...
+        "%FASTBOOT%" flash %%P_a "%~dp0firmware-update\%%P.img"
+        "%FASTBOOT%" flash %%P_b "%~dp0firmware-update\%%P.img"
     )
 )
-
-    bin\windows\fastboot.exe flash boot_a %~dp0boot.img
-    bin\windows\fastboot.exe flash boot_b %~dp0boot.img
-    bin\windows\fastboot.exe flash dtbo_a %~dp0firmware-update/dtbo.img
-    bin\windows\fastboot.exe flash dtbo_b %~dp0firmware-update/dtbo.img
-
 
 REM firmware
 
-bin\windows\fastboot.exe reboot bootloader
-ping 127.0.0.1 -n 5 >nul 2>nul
-bin\windows\fastboot.exe flash super %~dp0super.img
-if "%input%" == "2" (
-	if "%LANG%"=="Chinese" (
-	    echo. ����˫��ϵͳ,���ĵȴ�
-    ) else (
-        echo. Wiping data without wiping /data/media/, please wait patiently
-    ) 
-	bin\windows\fastboot.exe erase userdata
-	bin\windows\fastboot.exe erase metadata
+echo.
+
+:: ==========================================================
+:: 4. Flash super image
+:: ==========================================================
+echo [4/4] Flashing super image...
+echo.
+
+if not exist "%~dp0super.img" (
+    echo [ERROR] super.img not found at "%~dp0super.img"!
+    echo Please make sure super.img is placed in the ROM directory.
+    pause
+    exit /b 1
 )
 
+echo Flashing super.img (this may take several minutes)...
+"%FASTBOOT%" flash super "%~dp0super.img"
+if errorlevel 1 (
+    echo.
+    echo [ERROR] Failed to flash super.img!
+    pause
+    exit /b 1
+)
+
+if "%FORMAT_CHOICE%"=="2" (
+    echo.
+    echo Wiping userdata and metadata as requested...
+    "%FASTBOOT%" erase userdata
+    "%FASTBOOT%" erase metadata
+)
+
+:: Set active slot to a
 REM SET_ACTION_SLOT_A_BEGIN
-if "%LANG%"=="Chinese" (
-	echo. ���û����Ϊ 'a'��������ҪһЩʱ�䡣�����ֶ�����������ε������ߣ�������ܵ����豸��ש��
-) else (
-    echo. Starting the process to set the active slot to 'a.' This may take some time. Please refrain from manually restarting or unplugging the data cable, as doing so could result in the device becoming unresponsive.
-
-)
-bin\windows\fastboot.exe set_active a
+echo.
+echo Setting active slot to 'a'...
+"%FASTBOOT%" set_active a
 REM SET_ACTION_SLOT_A_END
 
-bin\windows\fastboot.exe reboot
+echo.
+echo Rebooting device into system...
+"%FASTBOOT%" reboot
 
-if "%LANG%"=="Chinese" (
-    echo. ˢ�����,���ֻ���ʱ��δ�������ֶ�����,��������˳�
-) else (
-    echo. Flash completed. If the phone does not restart for an extended period, please manually restart. Press any key to exit.
-)
+echo.
+echo ========================================================
+echo Flashing completed successfully!
+echo If your phone does not restart automatically, please restart manually.
+echo ========================================================
 pause
-exit
+exit /b 0
