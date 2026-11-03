@@ -79,9 +79,7 @@ class ConfigMerger:
         else:
             getattr(logger, level, logger.info)(message)
 
-    def merge(
-        self, base: Dict[str, Any], extra: Dict[str, Any], path: str = ""
-    ) -> Dict[str, Any]:
+    def merge(self, base: Dict[str, Any], extra: Dict[str, Any], path: str = "") -> Dict[str, Any]:
         """
         Merge two configurations with strategy support.
 
@@ -223,6 +221,8 @@ class ConfigMerger:
             else:
                 # New item, append
                 result.append(extra_item)
+                if description:
+                    desc_to_index[description] = len(result) - 1
                 self._log("debug", f"Added to {path}: {description or 'unnamed'}")
 
         return result
@@ -302,18 +302,10 @@ class ConfigMerger:
 
         for rule in rules:
             raw_rule_id = rule.get("id")
-            rule_id = (
-                raw_rule_id
-                if isinstance(raw_rule_id, str) and raw_rule_id
-                else str(id(rule))
-            )
+            rule_id = raw_rule_id if isinstance(raw_rule_id, str) and raw_rule_id else str(id(rule))
             raw_depends_on = rule.get("depends_on", [])
             depends_on = (
-                [
-                    dep
-                    for dep in raw_depends_on
-                    if isinstance(dep, str)
-                ]
+                [dep for dep in raw_depends_on if isinstance(dep, str)]
                 if isinstance(raw_depends_on, list)
                 else []
             )
@@ -326,27 +318,22 @@ class ConfigMerger:
             return rules  # No dependencies to resolve
 
         # Topological sort using Kahn's algorithm
-        # Calculate in-degree
+        # Calculate in-degree and build reverse dependency graph for O(V + E) resolution
         in_degree: Dict[str, int] = {
             (
-                rule_id
-                if isinstance(rule_id := rule.get("id"), str) and rule_id
-                else str(id(rule))
+                rule_id if isinstance(rule_id := rule.get("id"), str) and rule_id else str(id(rule))
             ): 0
             for rule in rules
         }
-
-        for rule_id, deps in dep_graph.items():
-            for dep in deps:
-                if dep in in_degree:
-                    pass  # Dependency exists
-                else:
-                    self.report.warnings.append(f"Rule '{rule_id}' depends on unknown rule '{dep}'")
+        reverse_dep_graph: Dict[str, List[str]] = {}
 
         for rule_id, deps in dep_graph.items():
             for dep in deps:
                 if dep in in_degree:
                     in_degree[rule_id] = in_degree.get(rule_id, 0) + 1
+                    reverse_dep_graph.setdefault(dep, []).append(rule_id)
+                else:
+                    self.report.warnings.append(f"Rule '{rule_id}' depends on unknown rule '{dep}'")
 
         # Start with rules that have no dependencies
         queue = [rid for rid, deg in in_degree.items() if deg == 0]
@@ -368,12 +355,11 @@ class ConfigMerger:
                         result.append(r)
                         break
 
-            # Reduce in-degree for dependent rules
-            for rule_id, deps in dep_graph.items():
-                if current in deps:
-                    in_degree[rule_id] -= 1
-                    if in_degree[rule_id] == 0:
-                        queue.append(rule_id)
+            # Reduce in-degree for dependent rules in O(1) per edge
+            for rule_id in reverse_dep_graph.get(current, []):
+                in_degree[rule_id] -= 1
+                if in_degree[rule_id] == 0:
+                    queue.append(rule_id)
 
         # Check for circular dependencies
         if len(result) < len(rules):

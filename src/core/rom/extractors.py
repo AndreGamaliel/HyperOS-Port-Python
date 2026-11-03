@@ -168,7 +168,7 @@ def extract_fastboot(
             source = z.open(f)
             target_file = open(package.images_dir / Path(f).name, "wb")
             with source, target_file:
-                shutil.copyfileobj(source, target_file)
+                shutil.copyfileobj(source, target_file, length=1024 * 1024)
 
         from .utils import process_sparse_images
 
@@ -185,22 +185,42 @@ def extract_fastboot(
                     package.logger.info(
                         f"[{package.label}] Unpacking specific partitions: {partitions}"
                     )
-                    for part in partitions:
-                        part_a = f"{part}_a"
-                        try:
-                            cmd_py = [
-                                sys.executable,
-                                "src/utils/lpunpack.py",
-                                "-p",
-                                part_a,
-                                str(super_img),
-                                str(package.images_dir),
-                            ]
-                            package.shell.run(cmd_py)
-                        except Exception as e:
-                            package.logger.warning(
-                                f"[{package.label}] Failed to extract {part_a}: {e}"
-                            )
+                    # Optimize: batch extract in single pass first
+                    target_parts = [f"{part}_a" for part in partitions] + list(partitions)
+                    batch_success = False
+                    try:
+                        cmd_py = [
+                            sys.executable,
+                            "src/utils/lpunpack.py",
+                            "-p",
+                            ",".join(target_parts),
+                            str(super_img),
+                            str(package.images_dir),
+                        ]
+                        package.shell.run(cmd_py)
+                        batch_success = True
+                    except Exception as e:
+                        package.logger.debug(
+                            f"[{package.label}] Batch lpunpack failed ({e}), falling back to per-partition extraction..."
+                        )
+
+                    if not batch_success:
+                        for part in partitions:
+                            part_a = f"{part}_a"
+                            try:
+                                cmd_py = [
+                                    sys.executable,
+                                    "src/utils/lpunpack.py",
+                                    "-p",
+                                    part_a,
+                                    str(super_img),
+                                    str(package.images_dir),
+                                ]
+                                package.shell.run(cmd_py)
+                            except Exception as e:
+                                package.logger.warning(
+                                    f"[{package.label}] Failed to extract {part_a}: {e}"
+                                )
                 else:
                     package.logger.info(
                         f"[{package.label}] Unpacking ALL partitions from super.img..."

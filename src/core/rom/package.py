@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import logging
+import os
 import shutil
 import zipfile
 from pathlib import Path
@@ -230,7 +231,8 @@ class RomPackage:
         """
         self.logger.info(f"[{self.label}] Processing file extraction for logical partitions...")
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        max_workers = min(len(candidates) or 1, os.cpu_count() or 4, 8)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = []
             for part in candidates:
                 img_path = self.images_dir / f"{part}.img"
@@ -307,20 +309,32 @@ class RomPackage:
             return None
 
         # Robust config file detection
-        # Pattern search to handle both 'system_fs_config' and 'system_a_fs_config'
+        # Direct check for standard config locations first (fast path), then pattern search
         search_pattern = img_path.stem
 
-        possible_contexts = (
-            list(self.extracted_dir.glob(f"config/{search_pattern}_file_contexts"))
-            + list(target_dir.parent.glob(f"{search_pattern}_file_contexts"))
-            + list(target_dir.glob("*_file_contexts"))
-        )
+        direct_contexts = [
+            self.extracted_dir / "config" / f"{search_pattern}_file_contexts",
+            target_dir.parent / f"{search_pattern}_file_contexts",
+        ]
+        possible_contexts = [p for p in direct_contexts if p.exists()]
+        if not possible_contexts:
+            possible_contexts = (
+                list(self.extracted_dir.glob(f"config/{search_pattern}_file_contexts"))
+                + list(target_dir.parent.glob(f"{search_pattern}_file_contexts"))
+                + list(target_dir.glob("*_file_contexts"))
+            )
 
-        possible_fs_config = (
-            list(self.extracted_dir.glob(f"config/{search_pattern}_fs_config"))
-            + list(target_dir.parent.glob(f"{search_pattern}_fs_config"))
-            + list(target_dir.glob("*_fs_config"))
-        )
+        direct_fs = [
+            self.extracted_dir / "config" / f"{search_pattern}_fs_config",
+            target_dir.parent / f"{search_pattern}_fs_config",
+        ]
+        possible_fs_config = [p for p in direct_fs if p.exists()]
+        if not possible_fs_config:
+            possible_fs_config = (
+                list(self.extracted_dir.glob(f"config/{search_pattern}_fs_config"))
+                + list(target_dir.parent.glob(f"{search_pattern}_fs_config"))
+                + list(target_dir.glob("*_fs_config"))
+            )
 
         if possible_contexts:
             target_context = self.config_dir / f"{part_name}_file_contexts"

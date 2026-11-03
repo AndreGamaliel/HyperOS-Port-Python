@@ -34,8 +34,8 @@ def compute_file_hash(file_path: Path) -> str:
     hash_sha256 = hashlib.sha256()
 
     with open(file_path, "rb") as f:
-        # Read file in chunks to avoid memory issues with large files
-        for chunk in iter(lambda: f.read(4096), b""):
+        # Read file in 1MB chunks to avoid memory issues while minimizing syscalls
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
             hash_sha256.update(chunk)
 
     # Return first 16 characters of the hash (similar to how git handles it)

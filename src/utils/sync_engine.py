@@ -1,4 +1,7 @@
+import concurrent.futures
+import hashlib
 import logging
+import os
 import shutil
 import subprocess
 import threading
@@ -14,6 +17,8 @@ class ROMSyncEngine:
         # Directory-specific caches to avoid path confusion
         self._rom_caches: Dict[str, Dict] = {}
         self._package_caches: Dict[str, Dict] = {}
+        self._stock_rom_cache: Dict = {}
+        self._target_rom_cache: Dict = {}
         self._cache_lock = threading.Lock()
 
     def _build_cache(self, directory: Path) -> dict:
@@ -67,11 +72,11 @@ class ROMSyncEngine:
         Execute all ROM porting and trimming rules
         Supported modes: file_to_dir, file_to_file, dir_to_dir, hexpatch, prop_append, delete
         """
-        # Lazy load global cache
-        if source_dir and not self._stock_rom_cache:
-            self._stock_rom_cache = self._build_cache(source_dir)
-        if target_dir and not self._target_rom_cache:
-            self._target_rom_cache = self._build_cache(target_dir)
+        # Lazy load directory cache (reusing cached indexes)
+        if source_dir:
+            self._stock_rom_cache = self._get_rom_cache(source_dir)
+        if target_dir:
+            self._target_rom_cache = self._get_rom_cache(target_dir)
 
         self.logger.info(f"Executing {len(rules)} porting rules...")
 
@@ -255,13 +260,7 @@ class ROMSyncEngine:
                             old_file.exists()
                             and override_file.stat().st_size == old_file.stat().st_size
                         ):
-                            import hashlib
-
-                            def get_hash(p):
-                                with open(p, "rb") as f:
-                                    return hashlib.md5(f.read()).hexdigest()
-
-                            if get_hash(override_file) == get_hash(old_file):
+                            if self._file_md5(override_file) == self._file_md5(old_file):
                                 self.logger.debug(
                                     "     [=] Source and target APKs are identical, skipping erasure."
                                 )
@@ -335,8 +334,16 @@ class ROMSyncEngine:
             )
             return None
 
+    def _file_md5(self, path: Path) -> str:
+        """Stream MD5 hash calculation in 1MB chunks to avoid memory spikes."""
+        h = hashlib.md5()
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                h.update(chunk)
+        return h.hexdigest()
+
     def _build_package_cache(self, directory: Path):
-        """Scan all APKs in directory, extract and cache their Package Name"""
+        """Scan all APKs in directory, extract and cache their Package Name (parallelized)"""
         dir_key = str(directory.resolve())
 
         with self._cache_lock:
@@ -350,16 +357,26 @@ class ROMSyncEngine:
             self.logger.info(f"Building APK package name cache for {directory.name}...")
             start_time = time.time()
 
-            package_cache = {}
+            apk_files = list(directory.rglob("*.apk"))
+            package_cache: Dict[str, List[Path]] = {}
             apk_count = 0
-            # Only scan .apk files, skip .odex, .vdex etc.
-            for apk_path in directory.rglob("*.apk"):
-                pkg_name = self._get_apk_package_name(apk_path)
-                if pkg_name:
-                    if pkg_name not in package_cache:
-                        package_cache[pkg_name] = []
-                    package_cache[pkg_name].append(apk_path)
-                    apk_count += 1
+
+            max_workers = min(len(apk_files) or 1, os.cpu_count() or 4, 8)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                future_to_apk = {
+                    executor.submit(self._get_apk_package_name, apk): apk for apk in apk_files
+                }
+                for future in concurrent.futures.as_completed(future_to_apk):
+                    apk = future_to_apk[future]
+                    try:
+                        pkg_name = future.result()
+                        if pkg_name:
+                            if pkg_name not in package_cache:
+                                package_cache[pkg_name] = []
+                            package_cache[pkg_name].append(apk)
+                            apk_count += 1
+                    except Exception as e:
+                        self.logger.debug(f"Failed to parse package name for {apk.name}: {e}")
 
             self._package_caches[dir_key] = package_cache
 

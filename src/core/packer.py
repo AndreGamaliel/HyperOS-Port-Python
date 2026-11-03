@@ -344,7 +344,7 @@ class Repacker:
             if item.is_dir() and item.name not in ["config", "repack_images"]:
                 partitions.append(item.name)
 
-        max_workers: int = 4
+        max_workers: int = min(len(partitions) or 1, os.cpu_count() or 4, 8)
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = []
             for part_name in partitions:
@@ -747,8 +747,8 @@ class Repacker:
             )
             self._convert_to_sparse(super_image_path, out_path / "super.img")
         else:
-            self.logger.info(f"Copying {super_image_path.name} (sparse)...")
-            shutil.copy2(super_image_path, out_path / "super.img")
+            self.logger.info(f"Moving {super_image_path.name} (sparse) into package...")
+            shutil.move(super_image_path, out_path / "super.img")
 
         if self.ctx.repack_images_dir.exists():
             for fw in self.ctx.repack_images_dir.glob("*.img"):
@@ -811,7 +811,9 @@ class Repacker:
         md5: str = md5_hash.hexdigest()[:10]
         prefix = build_rom_filename_prefix(self.ctx)
         device_tag = build_rom_filename_device_tag(self.ctx)
-        renamed_zip_name: str = f"{prefix}{device_tag}_Hybrid_{self.ctx.target_rom_version}_{self.ctx.security_patch}_{md5}_{timestamp}.zip"
+        renamed_zip_name: str = (
+            f"{prefix}{device_tag}_Hybrid_{self.ctx.target_rom_version}_{self.ctx.security_patch}_{md5}_{timestamp}.zip"
+        )
         renamed_zip_path: Path = self.out_dir / renamed_zip_name
         final_zip_path.rename(renamed_zip_path)
         self.logger.info(f"Hybrid ROM generated: {renamed_zip_path}")
@@ -895,13 +897,7 @@ class Repacker:
             elif fw == "dspso.bin":
                 part = "dsp"
 
-            if (
-                "dtbo" in fw
-                or "cust" in fw
-                or fw == "boot.img"
-                or part in content
-                or fw in content
-            ):
+            if "dtbo" in fw or "cust" in fw or fw == "boot.img" or part in content or fw in content:
                 continue
 
             if self.ctx.is_ab_device:
@@ -935,12 +931,43 @@ class Repacker:
         insertion: List[str] = []
 
         handled_script_partitions = {
-            "dtbo", "init_boot", "vendor_boot", "recovery", "vbmeta", "vbmeta_system",
-            "vm-bootsys", "pvmfw", "modem", "modemfirmware", "dsp", "bluetooth", "xbl",
-            "xbl_config", "xbl_ramdump", "tz", "hyp", "uefi", "uefisecapp", "keymaster",
-            "qupfw", "devcfg", "featenabler", "cpucp", "cpucp_dtb", "aop", "aop_config",
-            "abl", "shrm", "soccp_debug", "soccp_dcd", "spuservice", "imagefv",
-            "countrycode", "idmanager", "multiimgqti", "boot",
+            "dtbo",
+            "init_boot",
+            "vendor_boot",
+            "recovery",
+            "vbmeta",
+            "vbmeta_system",
+            "vm-bootsys",
+            "pvmfw",
+            "modem",
+            "modemfirmware",
+            "dsp",
+            "bluetooth",
+            "xbl",
+            "xbl_config",
+            "xbl_ramdump",
+            "tz",
+            "hyp",
+            "uefi",
+            "uefisecapp",
+            "keymaster",
+            "qupfw",
+            "devcfg",
+            "featenabler",
+            "cpucp",
+            "cpucp_dtb",
+            "aop",
+            "aop_config",
+            "abl",
+            "shrm",
+            "soccp_debug",
+            "soccp_dcd",
+            "spuservice",
+            "imagefv",
+            "countrycode",
+            "idmanager",
+            "multiimgqti",
+            "boot",
         }
 
         for fw in fw_files:
@@ -1163,10 +1190,21 @@ class Repacker:
         if pk8_path.exists() and not pem_path.exists():
             try:
                 import subprocess
+
                 subprocess.run(
-                    ["openssl", "pkcs8", "-in", str(pk8_path), "-inform", "DER",
-                     "-out", str(pem_path), "-nocrypt"],
-                    check=True, capture_output=True
+                    [
+                        "openssl",
+                        "pkcs8",
+                        "-in",
+                        str(pk8_path),
+                        "-inform",
+                        "DER",
+                        "-out",
+                        str(pem_path),
+                        "-nocrypt",
+                    ],
+                    check=True,
+                    capture_output=True,
                 )
                 self.logger.info(f"Generated AVB signing key from {pk8_path.name}")
                 return pem_path
@@ -1707,8 +1745,7 @@ class Repacker:
         try:
             self.shell.run(cmd, env=self._avb_env())
             self.logger.info(
-                "Generated care_map.pb with partitions: %s",
-                ", ".join(sorted(hashtree_parts))
+                "Generated care_map.pb with partitions: %s", ", ".join(sorted(hashtree_parts))
             )
         except subprocess.CalledProcessError as e:
             self.logger.warning("Failed to generate care_map.pb: %s", e)
@@ -1970,7 +2007,11 @@ class Repacker:
                 ],
                 env=env,
             )
-            md5: str = hashlib.md5(open(output_zip, "rb").read()).hexdigest()[:10]
+            md5_hash = hashlib.md5()
+            with open(output_zip, "rb") as f:
+                for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                    md5_hash.update(chunk)
+            md5: str = md5_hash.hexdigest()[:10]
             prefix = build_rom_filename_prefix(self.ctx)
             device_tag = build_rom_filename_device_tag(self.ctx)
             final_path: Path = (
