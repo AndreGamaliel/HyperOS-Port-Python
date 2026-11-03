@@ -12,6 +12,15 @@ package_extract_file() {
   unzip -p "$ZIPFILE" $1 >$2
 }
 
+package_extract_super() {
+  ui_print "- 正在刷写分区 - Flashing $(echo $2 | cut -d '/' -f 6) "
+  if which simg2img >/dev/null 2>&1; then
+    unzip -p "$ZIPFILE" "$1" | simg2img - "$2" 2>/dev/null || unzip -p "$ZIPFILE" "$1" >"$2"
+  else
+    unzip -p "$ZIPFILE" "$1" >"$2"
+  fi
+}
+
 package_extract_zstd() {
   ui_print "- 正在刷写分区 - Flashing $(echo $2 | cut -d '/' -f 6) "
   unzip -p "$ZIPFILE" $1 | /tmp/META-INF/zstd -c -d >$2
@@ -126,7 +135,7 @@ package_extract_file "firmware-update/dtbo.img" "/dev/block/bootdevice/by-name/d
 if [ -f "/tmp/META-INF/zstd" ] && unzip -l "$ZIPFILE" | grep -q "super.zst"; then
     package_extract_zstd "super.zst" "/dev/block/bootdevice/by-name/super"
 else
-    package_extract_file "super.img" "/dev/block/bootdevice/by-name/super"
+    package_extract_super "super.img" "/dev/block/bootdevice/by-name/super"
 fi
 
 

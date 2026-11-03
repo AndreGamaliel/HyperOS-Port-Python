@@ -557,16 +557,65 @@ class Repacker:
             return 0
         return 0
 
+    def _is_sparse_image(self, path: Path) -> bool:
+        """Check whether image has Android sparse format header (0xED26FF3A)."""
+        try:
+            with open(path, "rb") as f:
+                return f.read(4) == b"\x3a\xff\x26\xed"
+        except OSError:
+            return False
+
+    def _convert_to_sparse(self, raw_img: Path, sparse_img: Path) -> None:
+        """Convert unsparse/raw image to Android sparse image format using img2simg."""
+        img2simg_bin = shutil.which("img2simg")
+        if not img2simg_bin:
+            candidates = [
+                self.ota_tools_dir / "bin" / "img2simg",
+                self.bin_dir / "linux/x86_64/img2simg",
+            ]
+            for c in candidates:
+                if c.exists():
+                    img2simg_bin = str(c)
+                    break
+
+        if img2simg_bin:
+            self.shell.run([str(img2simg_bin), str(raw_img), str(sparse_img)])
+        else:
+            raise FileNotFoundError(
+                "img2simg binary not found in PATH or tools directory. Cannot convert unsparse super.img to sparse."
+            )
+
+        if not self._is_sparse_image(sparse_img):
+            raise ValueError(
+                f"Generated {sparse_img.name} is not a valid Android sparse image (magic mismatch)."
+            )
+
     def pack_super_image(self) -> None:
-        """Pack super.img for non-payload.bin ROMs"""
+        """Pack super.img for non-payload.bin ROMs as sparse image."""
         self.logger.info("Packing super.img...")
 
         lpmake_path: Path = self.ota_tools_dir / "bin" / "lpmake"
         if not lpmake_path.exists():
-            self.logger.error(f"lpmake not found at {lpmake_path}")
-            return
+            sys_lpmake = shutil.which("lpmake")
+            if sys_lpmake:
+                lpmake_path = Path(sys_lpmake)
+            else:
+                self.logger.error(f"lpmake not found at {lpmake_path}")
+                return
 
+        raw_super: Path = self.ctx.target_dir / "super_raw.img"
         super_img: Path = self.ctx.target_dir / "super.img"
+        sparse_tmp: Path = self.ctx.target_dir / "super_sparse.img"
+
+        # Remove any previous super images before repacking to prevent stale data
+        for p in [raw_super, super_img, sparse_tmp]:
+            if p.exists():
+                self.logger.info(f"Removing previous image before repacking: {p.name}")
+                try:
+                    p.unlink()
+                except OSError as e:
+                    self.logger.warning(f"Failed to remove previous image {p.name}: {e}")
+
         super_size: int = self._get_super_size()
 
         base_args: List[str] = [
@@ -580,11 +629,11 @@ class Repacker:
             "--device",
             f"super:{super_size}",
             "--output",
-            str(super_img),
+            str(raw_super),
         ]
 
         if not self.ctx.is_ab_device:
-            self.logger.info("Packing A-only super.img")
+            self.logger.info("Packing A-only unsparse super.img")
             base_args.extend(
                 ["--metadata-slots", "2", "--group", f"qti_dynamic_partitions:{super_size}", "-F"]
             )
@@ -613,7 +662,7 @@ class Repacker:
                         ]
                     )
         else:
-            self.logger.info("Packing V-AB super.img")
+            self.logger.info("Packing V-AB unsparse super.img")
             base_args.extend(
                 [
                     "--virtual-ab",
@@ -655,9 +704,22 @@ class Repacker:
 
         try:
             self.shell.run(base_args)
-            self.logger.info("super.img generated successfully.")
+            self.logger.info(f"Unsparse super image ({raw_super.name}) generated successfully.")
         except subprocess.CalledProcessError as e:
-            self.logger.error(f"Failed to generate super.img: {e}")
+            self.logger.error(f"Failed to generate unsparse {raw_super.name}: {e}")
+            return
+
+        # Repack unsparse super.img to sparse super.img so the size is smaller
+        self.logger.info(f"Repacking unsparse {raw_super.name} to sparse {super_img.name}...")
+        try:
+            self._convert_to_sparse(raw_super, super_img)
+            self.logger.info(
+                f"Sparse {super_img.name} generated successfully (size: {super_img.stat().st_size} bytes)."
+            )
+        except Exception as e:
+            self.logger.error(
+                f"Failed to convert unsparse {raw_super.name} to sparse {super_img.name}: {e}"
+            )
             return
 
         self._generate_flash_script(super_img)
@@ -679,8 +741,14 @@ class Repacker:
         meta_inf: Path = out_path / "META-INF/com/google/android"
         meta_inf.mkdir(parents=True, exist_ok=True)
 
-        self.logger.info(f"Copying {super_image_path.name}...")
-        shutil.copy2(super_image_path, out_path / "super.img")
+        if not self._is_sparse_image(super_image_path):
+            self.logger.info(
+                f"{super_image_path.name} is unsparse. Repacking to sparse {out_path / 'super.img'}..."
+            )
+            self._convert_to_sparse(super_image_path, out_path / "super.img")
+        else:
+            self.logger.info(f"Copying {super_image_path.name} (sparse)...")
+            shutil.copy2(super_image_path, out_path / "super.img")
 
         if self.ctx.repack_images_dir.exists():
             for fw in self.ctx.repack_images_dir.glob("*.img"):
@@ -748,6 +816,25 @@ class Repacker:
         final_zip_path.rename(renamed_zip_path)
         self.logger.info(f"Hybrid ROM generated: {renamed_zip_path}")
         shutil.rmtree(out_path)
+
+        # Delete both unsparse super.img and sparse super.img from workspace target directory
+        self.logger.info("Cleaning up unsparse and sparse super images from workspace...")
+        cleanup_targets = [super_image_path]
+        if hasattr(self.ctx, "target_dir") and isinstance(self.ctx.target_dir, Path):
+            cleanup_targets.extend(
+                [
+                    self.ctx.target_dir / "super_raw.img",
+                    self.ctx.target_dir / "super.img",
+                    self.ctx.target_dir / "super_sparse.img",
+                ]
+            )
+        for target in set(cleanup_targets):
+            if target.exists():
+                try:
+                    target.unlink()
+                    self.logger.info(f"Deleted {target.name}")
+                except OSError as e:
+                    self.logger.warning(f"Failed to delete {target.name}: {e}")
 
     def _process_script_placeholders(self, file_path: Path) -> None:
         """Replace placeholders in scripts/update-binary"""

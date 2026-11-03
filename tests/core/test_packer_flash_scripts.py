@@ -129,4 +129,82 @@ def test_generate_hybrid_rom_contains_super_img_stored():
             super_info = zf.getinfo("super.img")
             assert super_info.compress_type == zipfile.ZIP_STORED
 
+            # Verify super.img in zip is indeed a sparse image
+            with zf.open("super.img") as super_file:
+                magic = super_file.read(4)
+                assert magic == b"\x3a\xff\x26\xed"
+
+        # Verify previous super_img in workspace was deleted after hybrid zip creation
+        assert not super_img.exists()
+
+
+def test_unsparse_to_sparse_conversion_and_cleanup():
+    """Verify raw/unsparse super image conversion to sparse and pre/post cleanup."""
+    import zipfile
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp = Path(tmpdir)
+        target_dir = tmp / "target"
+        target_dir.mkdir()
+        out_dir = tmp / "out"
+        out_dir.mkdir()
+
+        ctx = MagicMock()
+        ctx.stock_rom_code = "onyx"
+        ctx.base_android_version = "15"
+        ctx.target_rom_version = "OS2.0.1.0"
+        ctx.security_patch = "2025-01-01"
+        ctx.is_ab_device = True
+        ctx.target_dir = target_dir
+        ctx.repack_images_dir = tmp / "repack_images"
+        ctx.repack_images_dir.mkdir()
+        (ctx.repack_images_dir / "boot.img").write_bytes(b"boot_data")
+
+        packer = Repacker(ctx)
+        packer.out_dir = out_dir
+
+        # Test _is_sparse_image helper
+        raw_file = target_dir / "raw.img"
+        raw_file.write_bytes(b"\x00" * 4096)
+        assert not packer._is_sparse_image(raw_file)
+
+        sparse_file = target_dir / "sparse.img"
+        sparse_file.write_bytes(b"\x3a\xff\x26\xed" + b"\x00" * 4092)
+        assert packer._is_sparse_image(sparse_file)
+
+        # Create previous leftover images in target_dir
+        old_raw = target_dir / "super_raw.img"
+        old_sparse = target_dir / "super.img"
+        old_raw.write_bytes(b"old_raw_data")
+        old_sparse.write_bytes(b"old_sparse_data")
+
+        # Mock lpmake and img2simg runs
+        def fake_shell_run(cmd):
+            if "lpmake" in str(cmd[0]):
+                out_idx = cmd.index("--output")
+                out_path = Path(cmd[out_idx + 1])
+                out_path.write_bytes(b"fake_raw_super_content" * 100)
+            elif "img2simg" in str(cmd[0]):
+                out_path = Path(cmd[2])
+                out_path.write_bytes(b"\x3a\xff\x26\xed" + b"sparse_data")
+
+        packer.shell.run = MagicMock(side_effect=fake_shell_run)
+        packer._get_super_size = MagicMock(return_value=13411287040)
+
+        # Run pack_super_image
+        packer.pack_super_image()
+
+        # Verify old files and generated files were cleaned up from target_dir
+        assert not (target_dir / "super_raw.img").exists()
+        assert not (target_dir / "super.img").exists()
+        assert not (target_dir / "super_sparse.img").exists()
+
+        # Verify zip was generated with a sparse super.img inside
+        zip_files = list(out_dir.glob("*.zip"))
+        assert len(zip_files) == 1
+        with zipfile.ZipFile(zip_files[0], "r") as zf:
+            assert "super.img" in zf.namelist()
+            with zf.open("super.img") as sf:
+                assert sf.read(4) == b"\x3a\xff\x26\xed"
+
 
