@@ -55,8 +55,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--unpacking",
-        "--unpackng",
-        dest="unpacking",
         action="store_true",
         help="Extract and merge ROMs without repacking; resume repacking later with --resume-from-packer",
     )

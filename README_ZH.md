@@ -172,7 +172,7 @@ sudo python3 main.py --stock <底包路径> --port <移植包路径> --pack-type
 | `--enable-diff-report` | 生成产物差异报告（前后文件/属性/APK变化） | `false` |
 | `--diff-report` | 差异报告 JSON 输出路径 | `build/diff-report.json` |
 | `--custom-avb-chain` | 启用“自定义 AVB 验证链”（按 stock AVB 拓扑重建 footer/vbmeta 并校验） | `false` |
-| `--unpacking`, `--unpackng` | 仅解包与合并，不执行打包；后续可用 `--resume-from-packer` 恢复打包 | `false` |
+| `--unpacking` | 仅解包与合并，不执行打包；后续可用 `--resume-from-packer` 恢复打包 | `false` |
 | `--resume-from-packer` | 从已保存的 repack 检查点恢复，直接进入打包阶段 | `false` |
 
 ---

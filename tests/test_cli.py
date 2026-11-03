@@ -113,10 +113,6 @@ def test_parse_args_accepts_unpacking_flag(tmp_path):
     args = parse_args(["--stock", str(stock), "--unpacking"])
     assert args.unpacking is True
 
-    # Test alias --unpackng
-    args_alias = parse_args(["--stock", str(stock), "--unpackng"])
-    assert args_alias.unpacking is True
-
 
 def test_parse_args_rejects_unpacking_with_resume_from_packer(tmp_path):
     import pytest

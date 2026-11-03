@@ -169,7 +169,7 @@ sudo python3 main.py --stock <path_to_stock_zip> --port <path_to_port_zip> --pac
 | `--enable-diff-report` | Generate artifact diff report (files/props/APK changes) | `false` |
 | `--diff-report` | Output path for artifact diff report JSON | `build/diff-report.json` |
 | `--custom-avb-chain` | Enable custom AVB chain rebuild (stock-profiled footer/vbmeta rebuild + verification) | `false` |
-| `--unpacking`, `--unpackng` | Extract and merge ROMs without repacking; resume later with `--resume-from-packer` | `false` |
+| `--unpacking` | Extract and merge ROMs without repacking; resume later with `--resume-from-packer` | `false` |
 | `--resume-from-packer` | Resume from a saved repack checkpoint and jump directly to packaging | `false` |
 
 ---
