@@ -319,12 +319,12 @@ class ConfigMerger:
 
         # Topological sort using Kahn's algorithm
         # Calculate in-degree and build reverse dependency graph for O(V + E) resolution
-        in_degree: Dict[str, int] = {
-            (
-                rule_id if isinstance(rule_id := rule.get("id"), str) and rule_id else str(id(rule))
-            ): 0
-            for rule in rules
-        }
+        in_degree: Dict[str, int] = {}
+        for rule in rules:
+            rid = rule.get("id")
+            key = rid if isinstance(rid, str) and rid else str(id(rule))
+            in_degree[key] = 0
+
         reverse_dep_graph: Dict[str, List[str]] = {}
 
         for rule_id, deps in dep_graph.items():

@@ -58,18 +58,15 @@ $groups
 
 
 def build_attribute_string(attributes: int) -> str:
-    match attributes:
-        case attributes if attributes & LP_PARTITION_ATTR_READONLY:
-            result = "readonly"
-        case attributes if attributes & LP_PARTITION_ATTR_SLOT_SUFFIXED:
-            result = "slot-suffixed"
-        case attributes if attributes & LP_PARTITION_ATTR_UPDATED:
-            result = "updated"
-        case attributes if attributes & LP_PARTITION_ATTR_DISABLED:
-            result = "disabled"
-        case _:
-            result = "none"
-    return result
+    if attributes & LP_PARTITION_ATTR_READONLY:
+        return "readonly"
+    elif attributes & LP_PARTITION_ATTR_SLOT_SUFFIXED:
+        return "slot-suffixed"
+    elif attributes & LP_PARTITION_ATTR_UPDATED:
+        return "updated"
+    elif attributes & LP_PARTITION_ATTR_DISABLED:
+        return "disabled"
+    return "none"
 
 
 def build_block_device_flag_string(flags: int) -> str:
@@ -867,11 +864,10 @@ class LpUnpack(object):
                     raise LpUnpackError(f"Invalid metadata slot number: {self._slot_num}")
 
             if self._show_info:
-                match self._show_info_format:
-                    case FormatType.TEXT:
-                        print(metadata)
-                    case FormatType.JSON:
-                        print(f"{metadata.to_json()}\n")
+                if self._show_info_format == FormatType.TEXT:
+                    print(metadata)
+                elif self._show_info_format == FormatType.JSON:
+                    print(f"{metadata.to_json()}\n")
 
             if not self._show_info and self._out_dir is None:
                 raise LpUnpackError(message="Not specified directory for extraction")
