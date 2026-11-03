@@ -381,6 +381,12 @@ def execute_porting(args, logger: logging.Logger) -> int:
         except (FileNotFoundError, json.JSONDecodeError) as exc:
             logger.error(str(exc))
             return 2
+        if getattr(args, "ksu", False):
+            ctx.enable_ksu = True
+        if getattr(args, "custom_avb_chain", False):
+            ctx.enable_custom_avb_chain = True
+        if getattr(args, "avb_key", None):
+            ctx.avb_key = args.avb_key
         pack_type, fs_type = determine_pack_settings(args, ctx, logger)
         run_repacking(ctx, ["repack"], pack_type, fs_type, target_work_dir, logger)
         logger.info("Repack-only resume completed successfully.")
@@ -503,9 +509,10 @@ def execute_porting(args, logger: logging.Logger) -> int:
     if snapshot_manager:
         snapshot_manager.capture("phase3_modified", target_work_dir)
 
-    run_repacking(ctx, phases_to_run, pack_type, fs_type, target_work_dir, logger)
-    if snapshot_manager and ("repack" in phases_to_run or phases_to_run == DEFAULT_PHASES):
-        snapshot_manager.capture("phase4_repacked", target_work_dir)
+    # Save/update repack checkpoint with any modifications finalized
+    checkpoint_path = save_repack_checkpoint(ctx, work_dir)
+    logger.info("Repack checkpoint updated at: %s", checkpoint_path)
+
     if args.enable_diff_report and baseline_artifact_state is not None:
         final_artifact_state = collect_artifact_state(target_work_dir, logger)
         diff_report = generate_diff_report(baseline_artifact_state, final_artifact_state)
@@ -513,6 +520,24 @@ def execute_porting(args, logger: logging.Logger) -> int:
         report_path = save_diff_report(diff_report, args.diff_report)
         logger.info(f"Artifact diff report saved to: {report_path}")
         log_diff_report_summary(diff_report, logger)
+
+    if getattr(args, "unpacking", False):
+        logger.info("=" * 70)
+        logger.info("Unpacking and merging completed successfully (--unpacking mode).")
+        logger.info("Repacking was skipped. You can resume repacking at any time with:")
+        port_arg = f"--port {args.port} " if getattr(args, "port", None) else ""
+        logger.info(
+            "    sudo python3 main.py --stock %s %s--pack-type %s --resume-from-packer",
+            args.stock,
+            port_arg,
+            pack_type,
+        )
+        logger.info("=" * 70)
+        return 0
+
+    run_repacking(ctx, phases_to_run, pack_type, fs_type, target_work_dir, logger)
+    if snapshot_manager and ("repack" in phases_to_run or phases_to_run == DEFAULT_PHASES):
+        snapshot_manager.capture("phase4_repacked", target_work_dir)
 
     logger.info("=" * 70)
     logger.info("Porting completed successfully!")

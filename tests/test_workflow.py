@@ -40,6 +40,10 @@ def make_args(**overrides):
         "rollback_to_snapshot": None,
         "enable_diff_report": False,
         "diff_report": "build/diff-report.json",
+        "custom_avb_chain": False,
+        "avb_key": None,
+        "unpacking": False,
+        "resume_from_packer": False,
     }
     base.update(overrides)
     return Namespace(**base)
@@ -281,7 +285,9 @@ def test_save_and_load_repack_checkpoint_roundtrip(tmp_path):
     (target_dir / "config").mkdir(parents=True)
     (target_dir / "repack_images").mkdir(parents=True)
     (target_dir / "system").mkdir(parents=True)
-    (target_dir / "system" / "build.prop").write_text("ro.build.fingerprint=foo\n", encoding="utf-8")
+    (target_dir / "system" / "build.prop").write_text(
+        "ro.build.fingerprint=foo\n", encoding="utf-8"
+    )
 
     checkpoint = save_repack_checkpoint(ctx, work_dir)
     assert checkpoint.exists()
@@ -378,9 +384,7 @@ def test_execute_porting_generates_diff_report_when_enabled():
         4,
         1,
     )
-    logger.warning.assert_any_call(
-        "Artifact diff risk flags: %s", "HIGH_IMPACT_PATH_CHANGED"
-    )
+    logger.warning.assert_any_call("Artifact diff risk flags: %s", "HIGH_IMPACT_PATH_CHANGED")
 
 
 def test_execute_porting_persists_super_size_mismatch_in_diff_report(tmp_path, monkeypatch):
@@ -490,3 +494,127 @@ def test_inject_super_size_check_into_diff_report_adds_risk_flag_on_mismatch():
     risk_flags = diff_report["highlights"]["risk_flags"]
     assert any(flag.get("code") == "SUPER_SIZE_MISMATCH" for flag in risk_flags)
     assert diff_report["summary"]["risk_flags"] == len(risk_flags)
+
+
+def test_execute_porting_with_unpacking_flag_skips_repacking(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    logger = MagicMock()
+    args = make_args(unpacking=True, pack_type="super")
+
+    with (
+        patch("src.app.workflow.initialize_cache_manager") as bootstrap,
+        patch("src.app.workflow.log_run_configuration"),
+        patch("src.app.workflow.OtaToolsManager") as otatools_manager_cls,
+        patch("src.app.workflow.resolve_remote_inputs"),
+        patch("src.app.workflow.run_preflight") as run_preflight_mock,
+        patch("src.app.workflow.save_preflight_report"),
+        patch("src.app.workflow.resolve_work_paths") as resolve_work_paths,
+        patch("src.app.workflow.RomPackage") as rom_package_cls,
+        patch("src.app.workflow.PortingContext") as porting_context_cls,
+        patch("src.app.workflow.get_or_create_device_config", return_value={}),
+        patch("src.app.workflow.determine_pack_settings", return_value=("super", "erofs")),
+        patch("src.app.workflow.run_modification_phases") as run_mod_mock,
+        patch("src.app.workflow.save_repack_checkpoint") as save_checkpoint_mock,
+        patch("src.app.workflow.run_repacking") as run_repacking_mock,
+    ):
+        bootstrap.return_value.exit_code = None
+        bootstrap.return_value.cache_manager = None
+        otatools_manager_cls.return_value.ensure_otatools.return_value = True
+        run_preflight_mock.return_value.has_failures.return_value = False
+        work_dir = tmp_path / "build"
+        target_work_dir = work_dir / "target"
+        resolve_work_paths.return_value = (
+            work_dir,
+            work_dir / "stock",
+            work_dir / "port",
+            target_work_dir,
+        )
+
+        stock = rom_package_cls.return_value
+        porting_context = porting_context_cls.return_value
+        porting_context.stock = stock
+        porting_context.device_config = {}
+
+        assert execute_porting(args, logger) == 0
+
+    run_mod_mock.assert_called_once()
+    save_checkpoint_mock.assert_called()
+    run_repacking_mock.assert_not_called()
+    assert any("--resume-from-packer" in str(call) for call in logger.info.call_args_list)
+
+
+def test_execute_porting_resume_from_packer_success(tmp_path):
+    logger = MagicMock()
+    custom_key = tmp_path / "custom_key.pem"
+    args = make_args(
+        resume_from_packer=True,
+        ksu=True,
+        custom_avb_chain=True,
+        avb_key=custom_key,
+        pack_type="super",
+    )
+
+    fake_ctx = MagicMock()
+    fake_ctx.enable_ksu = False
+    fake_ctx.enable_custom_avb_chain = False
+    fake_ctx.avb_key = None
+
+    work_dir = tmp_path / "build"
+    target_work_dir = work_dir / "target"
+
+    with (
+        patch("src.app.workflow.initialize_cache_manager") as bootstrap,
+        patch("src.app.workflow.OtaToolsManager") as otatools_manager_cls,
+        patch("src.app.workflow.resolve_remote_inputs"),
+        patch(
+            "src.app.workflow.resolve_work_paths",
+            return_value=(work_dir, None, None, target_work_dir),
+        ),
+        patch(
+            "src.app.workflow.load_repack_checkpoint", return_value=fake_ctx
+        ) as load_checkpoint_mock,
+        patch("src.app.workflow.determine_pack_settings", return_value=("super", "erofs")),
+        patch("src.app.workflow.run_repacking") as run_repacking_mock,
+    ):
+        bootstrap.return_value.exit_code = None
+        bootstrap.return_value.cache_manager = None
+        otatools_manager_cls.return_value.ensure_otatools.return_value = True
+
+        assert execute_porting(args, logger) == 0
+
+    load_checkpoint_mock.assert_called_once_with(work_dir, target_work_dir, logger)
+    assert fake_ctx.enable_ksu is True
+    assert fake_ctx.enable_custom_avb_chain is True
+    assert fake_ctx.avb_key == custom_key
+    run_repacking_mock.assert_called_once_with(
+        fake_ctx, ["repack"], "super", "erofs", target_work_dir, logger
+    )
+
+
+def test_execute_porting_resume_from_packer_checkpoint_not_found(tmp_path):
+    logger = MagicMock()
+    args = make_args(resume_from_packer=True)
+
+    work_dir = tmp_path / "build"
+    target_work_dir = work_dir / "target"
+
+    with (
+        patch("src.app.workflow.initialize_cache_manager") as bootstrap,
+        patch("src.app.workflow.OtaToolsManager") as otatools_manager_cls,
+        patch("src.app.workflow.resolve_remote_inputs"),
+        patch(
+            "src.app.workflow.resolve_work_paths",
+            return_value=(work_dir, None, None, target_work_dir),
+        ),
+        patch(
+            "src.app.workflow.load_repack_checkpoint",
+            side_effect=FileNotFoundError("repack_checkpoint.json missing"),
+        ),
+    ):
+        bootstrap.return_value.exit_code = None
+        bootstrap.return_value.cache_manager = None
+        otatools_manager_cls.return_value.ensure_otatools.return_value = True
+
+        assert execute_porting(args, logger) == 2
+
+    logger.error.assert_called_once_with("repack_checkpoint.json missing")

@@ -132,6 +132,16 @@ sudo python3 main.py --stock <path_to_stock_zip>
 sudo python3 main.py --stock <path_to_stock_zip> --port <path_to_port_zip> --pack-type super
 ```
 
+**Two-Step Workflow (Unpack & Merge first, Repack later):**
+- Step 1: Unpack and merge without repacking:
+```bash
+sudo python3 main.py --stock <path_to_stock_zip> --port <path_to_port_zip> --pack-type super --unpacking
+```
+- Step 2: Resume repacking directly from `build/target/`:
+```bash
+sudo python3 main.py --stock <path_to_stock_zip> --port <path_to_port_zip> --pack-type super --resume-from-packer
+```
+
 ---
 
 ## 🛠️ Advanced Usage
@@ -159,6 +169,7 @@ sudo python3 main.py --stock <path_to_stock_zip> --port <path_to_port_zip> --pac
 | `--enable-diff-report` | Generate artifact diff report (files/props/APK changes) | `false` |
 | `--diff-report` | Output path for artifact diff report JSON | `build/diff-report.json` |
 | `--custom-avb-chain` | Enable custom AVB chain rebuild (stock-profiled footer/vbmeta rebuild + verification) | `false` |
+| `--unpacking`, `--unpackng` | Extract and merge ROMs without repacking; resume later with `--resume-from-packer` | `false` |
 | `--resume-from-packer` | Resume from a saved repack checkpoint and jump directly to packaging | `false` |
 
 ---

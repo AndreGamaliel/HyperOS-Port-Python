@@ -24,7 +24,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Inject KernelSU into init_boot/boot. Default: from config or False",
     )
     parser.add_argument("--work-dir", default="build", help="Working directory (default: build)")
-    parser.add_argument("--clean", action="store_true", help="Clean working directory before starting")
+    parser.add_argument(
+        "--clean", action="store_true", help="Clean working directory before starting"
+    )
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     parser.add_argument(
         "--pack-type",
@@ -50,6 +52,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--avb-key",
         type=Path,
         help="Path to custom AVB signing key (PEM format). Generate with: openssl genrsa -out key.pem 4096",
+    )
+    parser.add_argument(
+        "--unpacking",
+        "--unpackng",
+        dest="unpacking",
+        action="store_true",
+        help="Extract and merge ROMs without repacking; resume repacking later with --resume-from-packer",
     )
     parser.add_argument(
         "--resume-from-packer",
@@ -122,7 +131,9 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Enable partition-level caching (disabled by default). APK caching is always enabled.",
     )
-    parser.add_argument("--clear-cache", action="store_true", help="Clear all cache before starting")
+    parser.add_argument(
+        "--clear-cache", action="store_true", help="Clear all cache before starting"
+    )
     parser.add_argument(
         "--show-cache-stats", action="store_true", help="Show cache statistics and exit"
     )
@@ -172,6 +183,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             parser.error(
                 f"invalid choice: {', '.join(invalid)} (choose from {', '.join(VALID_PHASES)})"
             )
+
+    if getattr(args, "unpacking", False) and getattr(args, "resume_from_packer", False):
+        parser.error("Cannot combine --unpacking and --resume-from-packer.")
 
     _validate_local_input_path(parser, value=args.stock, label="stock")
     _validate_local_input_path(parser, value=args.port, label="port")

@@ -12,7 +12,9 @@ def test_parse_args_rejects_missing_local_port_path(tmp_path):
 
 
 def test_parse_args_allows_remote_port_path():
-    args = parse_args(["--stock", "https://example.com/stock.zip", "--port", "https://example.com/port.zip"])
+    args = parse_args(
+        ["--stock", "https://example.com/stock.zip", "--port", "https://example.com/port.zip"]
+    )
 
     assert args.stock == "https://example.com/stock.zip"
     assert args.port == "https://example.com/port.zip"
@@ -103,3 +105,23 @@ def test_parse_args_accepts_resume_from_packer_flag(tmp_path):
     args = parse_args(["--stock", str(stock), "--resume-from-packer"])
 
     assert args.resume_from_packer is True
+
+
+def test_parse_args_accepts_unpacking_flag(tmp_path):
+    stock = tmp_path / "stock.zip"
+    stock.write_bytes(b"stub")
+    args = parse_args(["--stock", str(stock), "--unpacking"])
+    assert args.unpacking is True
+
+    # Test alias --unpackng
+    args_alias = parse_args(["--stock", str(stock), "--unpackng"])
+    assert args_alias.unpacking is True
+
+
+def test_parse_args_rejects_unpacking_with_resume_from_packer(tmp_path):
+    import pytest
+
+    stock = tmp_path / "stock.zip"
+    stock.write_bytes(b"stub")
+    with pytest.raises(SystemExit):
+        parse_args(["--stock", str(stock), "--unpacking", "--resume-from-packer"])
