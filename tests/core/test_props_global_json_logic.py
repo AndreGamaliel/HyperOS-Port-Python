@@ -72,3 +72,34 @@ def test_global_rom_branch_uses_generic_global_suffix_when_region_missing(tmp_pa
         port_global_region="",
     )
     assert _run_update_and_get_mod_device(ctx) == "pudding_global"
+
+
+def test_build_user_and_build_host_defaults(tmp_path):
+    ctx = SimpleNamespace(
+        target_dir=tmp_path / "target",
+        stock_rom_code="onyx",
+        target_rom_version="OS2.0.1.0",
+        is_port_eu_rom=False,
+        is_port_global_rom=False,
+        port_global_region="",
+    )
+    ctx.target_dir.mkdir(parents=True, exist_ok=True)
+    modifier = PropertyModifier(ctx, logger=logging.getLogger("test.props"))
+    assert modifier.build_user == "user"
+    assert modifier.build_host == "linux"
+
+    prop_file = ctx.target_dir / "build.prop"
+    prop_file.write_text(
+        "ro.build.user=original_user\nro.build.host=original_host\n",
+        encoding="utf-8",
+    )
+    modifier._update_general_info()
+
+    props = {}
+    for line in prop_file.read_text(encoding="utf-8").splitlines():
+        if "=" in line:
+            k, v = line.split("=", 1)
+            props[k] = v
+
+    assert props.get("ro.build.user") == "user"
+    assert props.get("ro.build.host") == "linux"

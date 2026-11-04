@@ -22,8 +22,8 @@ class PropertyModifier(ModifierPlugin):
         self.merger = ConfigMerger(self.logger)
 
         # Custom build info (can be passed from external parameters)
-        self.build_user = os.getenv("BUILD_USER", "Bruce")
-        self.build_host = os.getenv("BUILD_HOST", "HyperOS-Port")
+        self.build_user = os.getenv("BUILD_USER", "user")
+        self.build_host = os.getenv("BUILD_HOST", "linux")
 
     def modify(self) -> bool:
         """Execute all property modification logic"""
